@@ -1,8 +1,15 @@
 import { Phase, AgentRole } from '../core/types.js';
+import type { Task } from '../core/types.js';
+import type { Artifact } from './phase-manager.js';
+
+export interface GateContext {
+  artifacts: Map<Phase, Artifact[]>;
+  tasks: Task[];
+}
 
 export interface GateCondition {
-  description: string;
-  check: () => boolean;
+  name: string;
+  check: (ctx: GateContext) => boolean;
 }
 
 export interface PhaseConfig {
@@ -27,49 +34,144 @@ const DEFAULT_PHASE_CONFIGS: PhaseConfig[] = [
   {
     phase: Phase.RESEARCH,
     entryGate: [],
-    exitGate: [{ description: 'Research artifacts produced', check: () => true }],
+    exitGate: [
+      {
+        name: 'research-artifacts-exist',
+        check: (ctx) => (ctx.artifacts.get(Phase.RESEARCH)?.length ?? 0) >= 1,
+      },
+    ],
     requiredRoles: [AgentRole.RESEARCHER, AgentRole.ANALYST],
     optionalRoles: [AgentRole.PM],
   },
   {
     phase: Phase.PLAN,
-    entryGate: [{ description: 'Research complete', check: () => true }],
-    exitGate: [{ description: 'Plan approved', check: () => true }],
+    entryGate: [
+      {
+        name: 'research-complete',
+        check: (ctx) => (ctx.artifacts.get(Phase.RESEARCH)?.length ?? 0) >= 1,
+      },
+    ],
+    exitGate: [
+      {
+        name: 'task-board-has-tasks',
+        check: (ctx) => ctx.tasks.length >= 1,
+      },
+    ],
     requiredRoles: [AgentRole.PM, AgentRole.ARCHITECT],
     optionalRoles: [AgentRole.SCRUM_MASTER],
   },
   {
     phase: Phase.DESIGN,
-    entryGate: [{ description: 'Plan approved', check: () => true }],
-    exitGate: [{ description: 'Design artifacts ready', check: () => true }],
+    entryGate: [
+      {
+        name: 'plan-approved',
+        check: (ctx) => ctx.tasks.length >= 1,
+      },
+    ],
+    exitGate: [
+      {
+        name: 'design-artifact-exists',
+        check: (ctx) =>
+          (ctx.artifacts.get(Phase.DESIGN)?.length ?? 0) >= 1,
+      },
+    ],
     requiredRoles: [AgentRole.DESIGNER, AgentRole.ARCHITECT],
     optionalRoles: [AgentRole.CRITIC],
   },
   {
     phase: Phase.CODE,
-    entryGate: [{ description: 'Design complete', check: () => true }],
-    exitGate: [{ description: 'Implementation complete', check: () => true }],
+    entryGate: [
+      {
+        name: 'design-complete',
+        check: (ctx) => (ctx.artifacts.get(Phase.DESIGN)?.length ?? 0) >= 1,
+      },
+    ],
+    exitGate: [
+      {
+        name: 'code-artifact-exists',
+        check: (ctx) => (ctx.artifacts.get(Phase.CODE)?.length ?? 0) >= 1,
+      },
+    ],
     requiredRoles: [AgentRole.DEVELOPER],
     optionalRoles: [AgentRole.ARCHITECT, AgentRole.SECURITY],
   },
   {
     phase: Phase.TEST,
-    entryGate: [{ description: 'Code complete', check: () => true }],
-    exitGate: [{ description: 'All tests passing', check: () => true }],
+    entryGate: [
+      {
+        name: 'code-complete',
+        check: (ctx) => (ctx.artifacts.get(Phase.CODE)?.length ?? 0) >= 1,
+      },
+    ],
+    exitGate: [
+      {
+        name: 'test-results-passing',
+        check: (ctx) => {
+          const testArtifacts = ctx.artifacts.get(Phase.TEST) ?? [];
+          return testArtifacts.some(
+            (a) =>
+              a.type === 'test-results' &&
+              (a.content as { status?: string } | null)?.status === 'passing',
+          );
+        },
+      },
+    ],
     requiredRoles: [AgentRole.QA],
     optionalRoles: [AgentRole.SECURITY, AgentRole.DEVELOPER],
   },
   {
     phase: Phase.REVIEW,
-    entryGate: [{ description: 'Tests passing', check: () => true }],
-    exitGate: [{ description: 'Review approved', check: () => true }],
+    entryGate: [
+      {
+        name: 'tests-passing',
+        check: (ctx) => {
+          const testArtifacts = ctx.artifacts.get(Phase.TEST) ?? [];
+          return testArtifacts.some(
+            (a) =>
+              a.type === 'test-results' &&
+              (a.content as { status?: string } | null)?.status === 'passing',
+          );
+        },
+      },
+    ],
+    exitGate: [
+      {
+        name: 'review-approval-exists',
+        check: (ctx) => {
+          const reviewArtifacts = ctx.artifacts.get(Phase.REVIEW) ?? [];
+          return reviewArtifacts.some((a) => a.type === 'review-approval');
+        },
+      },
+    ],
     requiredRoles: [AgentRole.CRITIC, AgentRole.JUDGE],
     optionalRoles: [AgentRole.SECURITY, AgentRole.ARCHITECT],
   },
   {
     phase: Phase.DEPLOY,
-    entryGate: [{ description: 'Review approved', check: () => true }],
-    exitGate: [{ description: 'Deployment successful', check: () => true }],
+    entryGate: [
+      {
+        name: 'all-previous-phases-have-artifacts',
+        check: (ctx) => {
+          const required: Phase[] = [
+            Phase.RESEARCH,
+            Phase.PLAN,
+            Phase.DESIGN,
+            Phase.CODE,
+            Phase.TEST,
+            Phase.REVIEW,
+          ];
+          return required.every(
+            (phase) => (ctx.artifacts.get(phase)?.length ?? 0) >= 1,
+          );
+        },
+      },
+    ],
+    exitGate: [
+      {
+        name: 'deployment-successful',
+        check: (ctx) => (ctx.artifacts.get(Phase.DEPLOY)?.length ?? 0) >= 1,
+      },
+    ],
     requiredRoles: [AgentRole.DEVOPS],
     optionalRoles: [AgentRole.PM],
   },
@@ -99,13 +201,17 @@ export class Pipeline {
     return cfg;
   }
 
-  canAdvance(): boolean {
+  canAdvance(ctx?: GateContext): boolean {
     const cfg = this.getPhaseConfig(this._currentPhase);
-    return cfg.exitGate.every((cond) => cond.check());
+    const effectiveCtx: GateContext = ctx ?? {
+      artifacts: new Map(),
+      tasks: [],
+    };
+    return cfg.exitGate.every((cond) => cond.check(effectiveCtx));
   }
 
-  advance(): Phase {
-    if (!this.canAdvance()) {
+  advance(ctx?: GateContext): Phase {
+    if (!this.canAdvance(ctx)) {
       throw new Error(`Exit gate conditions not met for phase: ${this._currentPhase}`);
     }
 

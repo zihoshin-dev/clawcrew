@@ -9,6 +9,8 @@ import { AgentFactory } from '../agents/factory.js';
 import type { BaseAgent } from '../agents/base.js';
 import { createAdapter } from '../messenger/factory.js';
 import type { MessengerAdapter } from '../messenger/adapter.js';
+import { createLogger } from './logger.js';
+import type { Logger } from './logger.js';
 
 export type { AigoraConfig };
 
@@ -32,6 +34,7 @@ export class OrchestrationEngine {
   private readonly messengers: MessengerAdapter[] = [];
   private readonly projectAgents: Map<string, BaseAgent[]> = new Map();
 
+  private readonly logger: Logger;
   private running = false;
   private startedAt: Date | undefined;
 
@@ -40,6 +43,7 @@ export class OrchestrationEngine {
     this.bus = createEventBus();
     this.registry = AgentRegistry.getInstance();
     this.llmRouter = new LLMRouter();
+    this.logger = createLogger('aigora:engine', config.logLevel ?? 'info');
   }
 
   // ---------------------------------------------------------------------------
@@ -57,7 +61,7 @@ export class OrchestrationEngine {
     this.attachCoreListeners();
     await this.connectMessengers();
 
-    this.log('info', 'OrchestrationEngine started.');
+    this.logger.info('OrchestrationEngine started.');
   }
 
   async stop(): Promise<void> {
@@ -76,7 +80,7 @@ export class OrchestrationEngine {
     this.running = false;
     this.startedAt = undefined;
 
-    this.log('info', 'OrchestrationEngine stopped.');
+    this.logger.info('OrchestrationEngine stopped.');
   }
 
   // ---------------------------------------------------------------------------
@@ -115,7 +119,7 @@ export class OrchestrationEngine {
       submittedAt: now,
     });
 
-    this.log('info', `Agenda submitted — project ${projectId}: "${agenda}"`);
+    this.logger.info(`Agenda submitted — project ${projectId}: "${agenda}"`);
 
     return projectId;
   }
@@ -164,7 +168,7 @@ export class OrchestrationEngine {
         recentMessages: project.messages.slice(-20),
       });
       const result = await agent.act(thought);
-      this.log('debug', `[AgentCycle] ${agent.name} → ${result.action}: ${result.output.slice(0, 100)}`);
+      this.logger.debug(`[AgentCycle] ${agent.name} → ${result.action}: ${result.output.slice(0, 100)}`);
     }
   }
 
@@ -213,7 +217,7 @@ export class OrchestrationEngine {
 
   private attachCoreListeners(): void {
     this.bus.on('AgendaSubmitted', ({ projectId, agenda }) => {
-      this.log('info', `[AgendaSubmitted] project=${projectId} agenda="${agenda}"`);
+      this.logger.info(`[AgendaSubmitted] project=${projectId} agenda="${agenda}"`);
       this.spawnAgentsForProject(projectId);
     });
 
@@ -223,10 +227,7 @@ export class OrchestrationEngine {
         project.phase = currentPhase;
         project.updatedAt = new Date();
       }
-      this.log(
-        'debug',
-        `[PhaseChanged] project=${projectId} ${previousPhase} → ${currentPhase}`,
-      );
+      this.logger.debug(`[PhaseChanged] project=${projectId} ${previousPhase} → ${currentPhase}`);
     });
 
     this.bus.on('TaskCompleted', ({ projectId, taskId }) => {
@@ -242,17 +243,11 @@ export class OrchestrationEngine {
     });
 
     this.bus.on('DeadlockDetected', ({ projectId, phase, involvedAgents }) => {
-      this.log(
-        'warn',
-        `[DeadlockDetected] project=${projectId} phase=${phase} agents=${involvedAgents.join(',')}`,
-      );
+      this.logger.warn(`[DeadlockDetected] project=${projectId} phase=${phase} agents=${involvedAgents.join(',')}`);
     });
 
     this.bus.on('ErrorOccurred', ({ error, context, projectId }) => {
-      this.log(
-        'error',
-        `[ErrorOccurred] project=${projectId ?? 'global'} context=${context ?? ''}: ${error.message}`,
-      );
+      this.logger.error(`[ErrorOccurred] project=${projectId ?? 'global'} context=${context ?? ''}: ${error.message}`);
     });
   }
 
@@ -261,13 +256,13 @@ export class OrchestrationEngine {
       try {
         const adapter = createAdapter(messengerConfig);
         adapter.onMessage((msg) => {
-          this.log('debug', `[Messenger] Received: ${msg.text.slice(0, 80)}`);
+          this.logger.debug(`[Messenger] Received: ${msg.text.slice(0, 80)}`);
         });
         await adapter.connect();
         this.messengers.push(adapter);
-        this.log('info', `Messenger connected: type=${messengerConfig.type}`);
+        this.logger.info(`Messenger connected: type=${messengerConfig.type}`);
       } catch (err) {
-        this.log('warn', `Failed to connect messenger ${messengerConfig.type}: ${err instanceof Error ? err.message : String(err)}`);
+        this.logger.warn(`Failed to connect messenger ${messengerConfig.type}: ${err instanceof Error ? err.message : String(err)}`);
       }
     }
   }
@@ -275,16 +270,6 @@ export class OrchestrationEngine {
   private assertRunning(): void {
     if (!this.running) {
       throw new Error('OrchestrationEngine is not running. Call start() first.');
-    }
-  }
-
-  private log(level: 'debug' | 'info' | 'warn' | 'error', message: string): void {
-    const configLevel = this.config.logLevel ?? 'info';
-    const levels: Record<string, number> = { debug: 0, info: 1, warn: 2, error: 3 };
-    if ((levels[level] ?? 0) >= (levels[configLevel] ?? 1)) {
-      const prefix = `[aigora:engine] [${level.toUpperCase()}]`;
-      // eslint-disable-next-line no-console
-      console.log(`${prefix} ${message}`);
     }
   }
 }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Pipeline } from '../../src/orchestrator/pipeline.js';
 import { Phase, AgentRole } from '../../src/core/types.js';
-import type { PhaseConfig } from '../../src/orchestrator/pipeline.js';
+import type { PhaseConfig, GateContext } from '../../src/orchestrator/pipeline.js';
 
 const EXPECTED_ORDER: Phase[] = [
   Phase.RESEARCH,
@@ -12,6 +12,24 @@ const EXPECTED_ORDER: Phase[] = [
   Phase.REVIEW,
   Phase.DEPLOY,
 ];
+
+/** Build a GateContext with artifacts for all phases so default gates pass. */
+function fullContext(): GateContext {
+  const artifacts = new Map<Phase, any[]>();
+  for (const phase of EXPECTED_ORDER) {
+    if (phase === Phase.TEST) {
+      artifacts.set(phase, [{ type: 'test-results', content: { status: 'passing' }, createdBy: 'test', phase }]);
+    } else if (phase === Phase.REVIEW) {
+      artifacts.set(phase, [{ type: 'review-approval', content: { approved: true }, createdBy: 'test', phase }]);
+    } else {
+      artifacts.set(phase, [{ type: 'artifact', content: 'ok', createdBy: 'test', phase }]);
+    }
+  }
+  return {
+    artifacts,
+    tasks: [{ id: 't1', title: 'task', description: '', status: 'completed', phase: Phase.RESEARCH, createdAt: new Date(), updatedAt: new Date() } as any],
+  };
+}
 
 describe('Pipeline', () => {
   describe('initial state', () => {
@@ -29,26 +47,28 @@ describe('Pipeline', () => {
   describe('advance', () => {
     it('moves from RESEARCH to PLAN on first advance()', () => {
       const pipeline = new Pipeline();
-      pipeline.advance();
+      pipeline.advance(fullContext());
       expect(pipeline.currentPhase).toBe(Phase.PLAN);
     });
 
     it('traverses all phases in the correct order', () => {
       const pipeline = new Pipeline();
+      const ctx = fullContext();
       const visited: Phase[] = [pipeline.currentPhase];
       for (let i = 0; i < EXPECTED_ORDER.length - 1; i++) {
-        visited.push(pipeline.advance());
+        visited.push(pipeline.advance(ctx));
       }
       expect(visited).toEqual(EXPECTED_ORDER);
     });
 
     it('throws when trying to advance past DEPLOY (final phase)', () => {
       const pipeline = new Pipeline();
+      const ctx = fullContext();
       for (let i = 0; i < EXPECTED_ORDER.length - 1; i++) {
-        pipeline.advance();
+        pipeline.advance(ctx);
       }
       expect(pipeline.currentPhase).toBe(Phase.DEPLOY);
-      expect(() => pipeline.advance()).toThrow(/final phase|Cannot advance/);
+      expect(() => pipeline.advance(ctx)).toThrow(/final phase|Cannot advance/);
     });
 
     it('throws when exit gate conditions are not met', () => {
@@ -56,25 +76,25 @@ describe('Pipeline', () => {
         {
           phase: Phase.RESEARCH,
           entryGate: [],
-          exitGate: [{ description: 'blocker', check: () => false }],
+          exitGate: [{ name: 'blocker', check: () => false }],
           requiredRoles: [AgentRole.RESEARCHER],
         },
         ...EXPECTED_ORDER.slice(1).map((phase) => ({
           phase,
           entryGate: [],
-          exitGate: [{ description: 'ok', check: () => true }],
+          exitGate: [{ name: 'ok', check: () => true }],
           requiredRoles: [],
         })),
       ];
       const pipeline = new Pipeline(blockingConfig);
-      expect(() => pipeline.advance()).toThrow(/Exit gate/);
+      expect(() => pipeline.advance(fullContext())).toThrow(/Exit gate/);
     });
   });
 
   describe('canAdvance', () => {
-    it('returns true when all exit gate conditions pass', () => {
+    it('returns true when all exit gate conditions pass with sufficient context', () => {
       const pipeline = new Pipeline();
-      expect(pipeline.canAdvance()).toBe(true);
+      expect(pipeline.canAdvance(fullContext())).toBe(true);
     });
 
     it('returns false when any exit gate condition fails', () => {
@@ -82,7 +102,7 @@ describe('Pipeline', () => {
         {
           phase: Phase.RESEARCH,
           entryGate: [],
-          exitGate: [{ description: 'not done', check: () => false }],
+          exitGate: [{ name: 'not done', check: () => false }],
           requiredRoles: [],
         },
         ...EXPECTED_ORDER.slice(1).map((phase) => ({
@@ -93,7 +113,7 @@ describe('Pipeline', () => {
         })),
       ];
       const pipeline = new Pipeline(blockingConfig);
-      expect(pipeline.canAdvance()).toBe(false);
+      expect(pipeline.canAdvance(fullContext())).toBe(false);
     });
   });
 
@@ -109,8 +129,9 @@ describe('Pipeline', () => {
   describe('reset', () => {
     it('returns the pipeline to the RESEARCH phase', () => {
       const pipeline = new Pipeline();
-      pipeline.advance();
-      pipeline.advance();
+      const ctx = fullContext();
+      pipeline.advance(ctx);
+      pipeline.advance(ctx);
       pipeline.reset();
       expect(pipeline.currentPhase).toBe(Phase.RESEARCH);
     });
