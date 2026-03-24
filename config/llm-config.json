@@ -1,0 +1,49 @@
+{
+  "complexityRouting": {
+    "low": {
+      "primary": { "provider": "anthropic", "model": "claude-haiku-4-5" },
+      "secondary": { "provider": "openai", "model": "gpt-4o-mini" }
+    },
+    "medium": {
+      "primary": { "provider": "anthropic", "model": "claude-sonnet-4-5" },
+      "secondary": { "provider": "openai", "model": "gpt-4o-mini" }
+    },
+    "high": {
+      "primary": { "provider": "anthropic", "model": "claude-opus-4" },
+      "secondary": { "provider": "openai", "model": "gpt-4o" }
+    },
+    "critical": {
+      "providers": [
+        { "provider": "anthropic", "model": "claude-opus-4" },
+        { "provider": "openai", "model": "gpt-4o" },
+        { "provider": "google", "model": "gemini-2.5-pro" }
+      ]
+    }
+  },
+  "agentRoleOverrides": {
+    "RESEARCHER": { "complexity": "medium" },
+    "ARCHITECT": { "complexity": "high" },
+    "DEVELOPER": { "complexity": "medium" },
+    "CRITIC": { "complexity": "medium" },
+    "PM": { "complexity": "low" },
+    "QA": { "complexity": "low" },
+    "SECURITY": { "complexity": "high" },
+    "DESIGNER": { "complexity": "medium" },
+    "ANALYST": { "complexity": "medium" },
+    "MEDIATOR": { "complexity": "medium" },
+    "DEVOPS": { "complexity": "medium" },
+    "SCRUM_MASTER": { "complexity": "low" },
+    "JUDGE": { "complexity": "high" },
+    "RETROSPECTIVE": { "complexity": "low" }
+  },
+  "pricing": {
+    "claude-haiku-4-5": { "inputPer1k": 0.00025, "outputPer1k": 0.00125 },
+    "claude-sonnet-4-5": { "inputPer1k": 0.003, "outputPer1k": 0.015 },
+    "claude-opus-4": { "inputPer1k": 0.015, "outputPer1k": 0.075 },
+    "gpt-4o-mini": { "inputPer1k": 0.00015, "outputPer1k": 0.0006 },
+    "gpt-4o": { "inputPer1k": 0.0025, "outputPer1k": 0.01 },
+    "o1": { "inputPer1k": 0.015, "outputPer1k": 0.06 },
+    "gemini-2.0-flash": { "inputPer1k": 0.000075, "outputPer1k": 0.0003 },
+    "gemini-2.5-pro": { "inputPer1k": 0.00125, "outputPer1k": 0.01 }
+  }
+}

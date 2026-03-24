@@ -1,0 +1,127 @@
+{
+  "rules": [
+    {
+      "id": "block-recursive-delete",
+      "pattern": "\\brm\\s+.*-[a-zA-Z]*r[a-zA-Z]*",
+      "severity": "block",
+      "reason": "Recursive file deletion is not permitted"
+    },
+    {
+      "id": "block-drop-database",
+      "pattern": "\\bDROP\\s+(TABLE|DATABASE|SCHEMA)\\b",
+      "severity": "block",
+      "reason": "Destructive SQL DROP statements are not allowed"
+    },
+    {
+      "id": "block-mkfs",
+      "pattern": "\\bmkfs\\b",
+      "severity": "block",
+      "reason": "Filesystem creation commands are blocked"
+    },
+    {
+      "id": "block-dd-device",
+      "pattern": "\\bdd\\s+.*of=\\/dev\\/",
+      "severity": "block",
+      "reason": "Direct writes to block devices are not allowed"
+    },
+    {
+      "id": "block-shutdown",
+      "pattern": "\\b(shutdown|reboot|poweroff|halt)\\b",
+      "severity": "block",
+      "reason": "System power management commands are blocked"
+    },
+    {
+      "id": "block-chmod-777",
+      "pattern": "\\bchmod\\s+777\\b",
+      "severity": "block",
+      "reason": "chmod 777 grants world-writable access and is blocked"
+    },
+    {
+      "id": "block-fork-bomb",
+      "pattern": ":\\(\\)\\s*\\{.*:\\|:&",
+      "severity": "block",
+      "reason": "Fork bomb pattern detected"
+    },
+    {
+      "id": "warn-force-push",
+      "pattern": "\\bgit\\s+push\\s+.*--force\\b",
+      "severity": "warn",
+      "reason": "Force push can overwrite remote history — confirm intentional",
+      "roles": ["DEVELOPER", "DEVOPS"]
+    },
+    {
+      "id": "warn-npm-publish",
+      "pattern": "\\bnpm\\s+publish\\b",
+      "severity": "warn",
+      "reason": "Publishing to npm registry — confirm intentional",
+      "roles": ["DEVOPS", "DEVELOPER"]
+    },
+    {
+      "id": "warn-docker-rm",
+      "pattern": "\\bdocker\\s+rm\\b",
+      "severity": "warn",
+      "reason": "Removing Docker containers — confirm intentional",
+      "roles": ["DEVOPS"]
+    },
+    {
+      "id": "warn-git-reset-hard",
+      "pattern": "\\bgit\\s+reset\\s+--hard\\b",
+      "severity": "warn",
+      "reason": "Hard git reset discards uncommitted changes"
+    },
+    {
+      "id": "warn-truncate",
+      "pattern": "\\bTRUNCATE\\b",
+      "severity": "warn",
+      "reason": "TRUNCATE will delete all rows in the table"
+    }
+  ],
+  "rolePermissions": {
+    "DEVOPS": {
+      "allowedPatterns": [
+        "docker",
+        "kubectl",
+        "helm",
+        "terraform",
+        "ansible",
+        "git",
+        "npm",
+        "yarn",
+        "pnpm",
+        "systemctl",
+        "service",
+        "nginx",
+        "certbot"
+      ]
+    },
+    "QA": {
+      "allowedPatterns": [
+        "npm\\s+test",
+        "npx\\s+",
+        "vitest",
+        "jest",
+        "playwright",
+        "cypress",
+        "curl",
+        "wget",
+        "cat",
+        "ls",
+        "echo"
+      ]
+    },
+    "RESEARCHER": {
+      "allowedPatterns": [
+        "curl",
+        "wget",
+        "cat",
+        "ls",
+        "echo",
+        "grep",
+        "find",
+        "jq",
+        "python3",
+        "node"
+      ]
+    }
+  }
+}

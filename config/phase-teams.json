@@ -1,0 +1,30 @@
+{
+  "RESEARCH": {
+    "required": ["RESEARCHER", "ANALYST"],
+    "optional": ["PM"]
+  },
+  "PLAN": {
+    "required": ["PM", "ARCHITECT"],
+    "optional": ["SCRUM_MASTER", "CRITIC"]
+  },
+  "DESIGN": {
+    "required": ["DESIGNER", "ARCHITECT"],
+    "optional": ["CRITIC", "PM"]
+  },
+  "CODE": {
+    "required": ["DEVELOPER"],
+    "optional": ["ARCHITECT", "SECURITY"]
+  },
+  "TEST": {
+    "required": ["QA"],
+    "optional": ["SECURITY", "DEVELOPER"]
+  },
+  "REVIEW": {
+    "required": ["CRITIC", "JUDGE"],
+    "optional": ["SECURITY", "ARCHITECT"]
+  },
+  "DEPLOY": {
+    "required": ["DEVOPS"],
+    "optional": ["PM", "SECURITY"]
+  }
+}

@@ -1,0 +1,151 @@
+{
+  "RESEARCHER": {
+    "allowedActions": [
+      "search_web",
+      "fetch_url",
+      "summarise_document",
+      "compare_sources",
+      "produce_research_report",
+      "identify_knowledge_gaps",
+      "send_message"
+    ]
+  },
+  "ARCHITECT": {
+    "allowedActions": [
+      "design_system",
+      "create_adr",
+      "evaluate_technology",
+      "define_api_contract",
+      "review_architecture",
+      "document_trade_offs",
+      "send_message"
+    ]
+  },
+  "DEVELOPER": {
+    "allowedActions": [
+      "write_code",
+      "refactor_code",
+      "write_tests",
+      "debug",
+      "review_code",
+      "create_pull_request",
+      "send_message"
+    ]
+  },
+  "CRITIC": {
+    "allowedActions": [
+      "critique_proposal",
+      "identify_risks",
+      "challenge_assumptions",
+      "enumerate_edge_cases",
+      "produce_risk_register",
+      "send_message"
+    ]
+  },
+  "PM": {
+    "allowedActions": [
+      "define_requirements",
+      "prioritise_backlog",
+      "write_user_story",
+      "manage_scope",
+      "align_stakeholders",
+      "create_roadmap",
+      "send_message"
+    ]
+  },
+  "QA": {
+    "allowedActions": [
+      "write_test_plan",
+      "execute_tests",
+      "file_bug_report",
+      "define_acceptance_criteria",
+      "run_regression",
+      "approve_release",
+      "send_message"
+    ]
+  },
+  "SECURITY": {
+    "allowedActions": [
+      "threat_model",
+      "vulnerability_scan",
+      "review_auth",
+      "audit_dependencies",
+      "produce_security_report",
+      "enforce_policy",
+      "send_message"
+    ]
+  },
+  "DESIGNER": {
+    "allowedActions": [
+      "create_wireframe",
+      "conduct_user_research",
+      "define_user_flow",
+      "audit_accessibility",
+      "produce_design_spec",
+      "prototype",
+      "send_message"
+    ]
+  },
+  "ANALYST": {
+    "allowedActions": [
+      "define_metrics",
+      "analyse_data",
+      "produce_report",
+      "create_dashboard",
+      "run_query",
+      "forecast",
+      "send_message"
+    ]
+  },
+  "MEDIATOR": {
+    "allowedActions": [
+      "facilitate_discussion",
+      "reframe_conflict",
+      "build_consensus",
+      "summarise_positions",
+      "propose_compromise",
+      "send_message"
+    ]
+  },
+  "DEVOPS": {
+    "allowedActions": [
+      "configure_pipeline",
+      "provision_infrastructure",
+      "monitor_system",
+      "deploy_service",
+      "manage_secrets",
+      "incident_response",
+      "send_message"
+    ]
+  },
+  "SCRUM_MASTER": {
+    "allowedActions": [
+      "plan_sprint",
+      "facilitate_standup",
+      "remove_impediment",
+      "track_velocity",
+      "run_retrospective",
+      "update_board",
+      "send_message"
+    ]
+  },
+  "JUDGE": {
+    "allowedActions": [
+      "arbitrate_deadlock",
+      "evaluate_positions",
+      "render_verdict",
+      "document_decision",
+      "send_message"
+    ]
+  },
+  "RETROSPECTIVE": {
+    "allowedActions": [
+      "facilitate_retrospective",
+      "root_cause_analysis",
+      "capture_lessons_learned",
+      "create_action_items",
+      "track_improvements",
+      "send_message"
+    ]
+  }
+}
