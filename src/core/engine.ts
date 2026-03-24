@@ -219,6 +219,9 @@ export class OrchestrationEngine {
     this.bus.on('AgendaSubmitted', ({ projectId, agenda }) => {
       this.logger.info(`[AgendaSubmitted] project=${projectId} agenda="${agenda}"`);
       this.spawnAgentsForProject(projectId);
+      void this.runAgentCycle(projectId).catch((err) =>
+        this.logger.error(`Agent cycle error: ${err instanceof Error ? err.message : String(err)}`),
+      );
     });
 
     this.bus.on('PhaseChanged', ({ projectId, previousPhase, currentPhase }) => {

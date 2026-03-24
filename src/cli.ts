@@ -36,7 +36,10 @@ program
     });
 
     await engine.start();
-    console.log('[aigora] Engine started. Press Ctrl+C to stop.');
+    console.log('[clawcrew] Engine started. Press Ctrl+C to stop.');
+    // Keep event loop alive
+    const keepalive = setInterval(() => {}, 60_000);
+    process.on('beforeExit', () => clearInterval(keepalive));
   });
 
 // ---------------------------------------------------------------------------

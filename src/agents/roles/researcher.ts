@@ -9,21 +9,30 @@ export class ResearcherAgent extends BaseAgent {
   }
 
   async think(context: ThinkContext): Promise<Thought> {
+    const prompt = `Analyze the following agenda and identify key research areas, knowledge gaps, and prior art:\n\nAgenda: ${context.agenda}\nPhase: ${context.phase}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
+    const reasoning = llmResponse?.content
+      ?? 'Identifying key information sources, knowledge gaps, and prior art relevant to the agenda.';
+
     return this.buildThought(
       context,
       `Research analysis for: ${context.agenda}`,
-      'Identifying key information sources, knowledge gaps, and prior art relevant to the agenda.',
-      0.75,
+      reasoning,
+      llmResponse ? 0.85 : 0.75,
       'produce_research_report',
-      { phase: context.phase },
+      { phase: context.phase, usedLLM: !!llmResponse },
     );
   }
 
   async act(thought: Thought): Promise<ActionResult> {
+    const prompt = `Based on this research analysis, produce a structured research report:\n\n${thought.reasoning}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
     return this.buildResult(
       thought.suggestedAction,
-      `Research report stub for "${thought.summary}". LLM call will be wired here.`,
-      { sources: [], gaps: [] },
+      llmResponse?.content ?? `Research report for "${thought.summary}".`,
+      { sources: [], gaps: [], usedLLM: !!llmResponse },
     );
   }
 

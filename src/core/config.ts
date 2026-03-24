@@ -9,7 +9,7 @@ import type { AigoraConfig } from './types.js';
 // ---------------------------------------------------------------------------
 
 const MessengerConfigSchema = z.object({
-  type: z.enum(['slack', 'telegram', 'discord']),
+  type: z.enum(['slack', 'telegram']),
   token: z.string().default(''),
   signingSecret: z.string().optional(),
   botToken: z.string().optional(),

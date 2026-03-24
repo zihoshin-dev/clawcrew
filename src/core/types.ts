@@ -53,7 +53,7 @@ export interface LlmConfig {
 }
 
 export interface MessengerConfig {
-  type: 'slack' | 'telegram' | 'discord';
+  type: 'slack' | 'telegram';
   token: string;
   signingSecret?: string;
   botToken?: string;
