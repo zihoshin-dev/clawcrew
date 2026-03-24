@@ -97,8 +97,16 @@ program
     const engine = new OrchestrationEngine(config);
     await engine.start();
     const projectId = await engine.submitAgenda(agenda, opts.channel);
-    console.log(`[aigora] Agenda submitted. Project ID: ${projectId}`);
-    await engine.stop();
+    console.log(`[clawcrew] Agenda submitted. Project ID: ${projectId}`);
+    console.log('[clawcrew] Engine running. Press Ctrl+C to stop.');
+
+    const shutdown = async () => {
+      console.log('\n[clawcrew] Shutting down...');
+      await engine.stop();
+      process.exit(0);
+    };
+    process.on('SIGINT', () => void shutdown());
+    process.on('SIGTERM', () => void shutdown());
   });
 
 // ---------------------------------------------------------------------------

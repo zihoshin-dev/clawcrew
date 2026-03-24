@@ -4,6 +4,11 @@ import type { AigoraEvents } from './event-bus.js';
 import { AgentRegistry } from './registry.js';
 import { AgentStatus, Phase } from './types.js';
 import type { AigoraConfig, Project } from './types.js';
+import { LLMRouter } from './llm-router.js';
+import { AgentFactory } from '../agents/factory.js';
+import type { BaseAgent } from '../agents/base.js';
+import { createAdapter } from '../messenger/factory.js';
+import type { MessengerAdapter } from '../messenger/adapter.js';
 
 export type { AigoraConfig };
 
@@ -23,6 +28,9 @@ export class OrchestrationEngine {
   private readonly bus: EventBus<AigoraEvents>;
   private readonly registry: AgentRegistry;
   private readonly projects: Map<string, Project> = new Map();
+  private readonly llmRouter: LLMRouter;
+  private readonly messengers: MessengerAdapter[] = [];
+  private readonly projectAgents: Map<string, BaseAgent[]> = new Map();
 
   private running = false;
   private startedAt: Date | undefined;
@@ -31,6 +39,7 @@ export class OrchestrationEngine {
     this.config = config;
     this.bus = createEventBus();
     this.registry = AgentRegistry.getInstance();
+    this.llmRouter = new LLMRouter();
   }
 
   // ---------------------------------------------------------------------------
@@ -139,9 +148,73 @@ export class OrchestrationEngine {
   // Internal helpers
   // ---------------------------------------------------------------------------
 
+  /**
+   * Drive one think/act cycle for all agents assigned to a project.
+   */
+  async runAgentCycle(projectId: string): Promise<void> {
+    const project = this.projects.get(projectId);
+    if (project === undefined) return;
+    const agents = this.projectAgents.get(projectId) ?? [];
+
+    for (const agent of agents) {
+      const thought = await agent.think({
+        projectId,
+        phase: project.phase,
+        agenda: project.agenda,
+        recentMessages: project.messages.slice(-20),
+      });
+      const result = await agent.act(thought);
+      this.log('debug', `[AgentCycle] ${agent.name} → ${result.action}: ${result.output.slice(0, 100)}`);
+    }
+  }
+
+  private spawnAgentsForProject(projectId: string): void {
+    const phaseTeams: Record<string, string[]> = {
+      RESEARCH: ['RESEARCHER', 'ANALYST'],
+      PLAN: ['PM', 'ARCHITECT'],
+      DESIGN: ['DESIGNER', 'ARCHITECT'],
+      CODE: ['DEVELOPER'],
+      TEST: ['QA'],
+      REVIEW: ['CRITIC', 'SECURITY'],
+      DEPLOY: ['DEVOPS'],
+    };
+    const project = this.projects.get(projectId);
+    if (project === undefined) return;
+
+    const roleNames = phaseTeams[project.phase] ?? ['RESEARCHER'];
+    const agents: BaseAgent[] = [];
+
+    for (const roleName of roleNames) {
+      const role = roleName as keyof typeof import('../core/types.js').AgentRole;
+      try {
+        const agent = AgentFactory.create(role as any);
+        agent.setRouter(this.llmRouter);
+        this.registry.register({
+          id: agent.id,
+          name: agent.name,
+          role: agent.role,
+          status: agent.status,
+          capabilities: agent.getCapabilities().map(c => ({ name: c })),
+          model: 'auto',
+          registeredAt: new Date(),
+        });
+        agents.push(agent);
+      } catch {
+        // skip unknown roles
+      }
+    }
+
+    this.projectAgents.set(projectId, agents);
+    const project2 = this.projects.get(projectId);
+    if (project2 !== undefined) {
+      project2.agentIds = agents.map(a => a.id);
+    }
+  }
+
   private attachCoreListeners(): void {
     this.bus.on('AgendaSubmitted', ({ projectId, agenda }) => {
-      this.log('debug', `[AgendaSubmitted] project=${projectId} agenda="${agenda}"`);
+      this.log('info', `[AgendaSubmitted] project=${projectId} agenda="${agenda}"`);
+      this.spawnAgentsForProject(projectId);
     });
 
     this.bus.on('PhaseChanged', ({ projectId, previousPhase, currentPhase }) => {
@@ -185,13 +258,17 @@ export class OrchestrationEngine {
 
   private async connectMessengers(): Promise<void> {
     for (const messengerConfig of this.config.messengers) {
-      // Messenger adapters are responsible for their own initialization and
-      // will receive the event bus via getEventBus(). This method acts as the
-      // hook point for future adapter registration.
-      this.log(
-        'debug',
-        `Messenger connector registered: type=${messengerConfig.type}`,
-      );
+      try {
+        const adapter = createAdapter(messengerConfig);
+        adapter.onMessage((msg) => {
+          this.log('debug', `[Messenger] Received: ${msg.text.slice(0, 80)}`);
+        });
+        await adapter.connect();
+        this.messengers.push(adapter);
+        this.log('info', `Messenger connected: type=${messengerConfig.type}`);
+      } catch (err) {
+        this.log('warn', `Failed to connect messenger ${messengerConfig.type}: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   }
 

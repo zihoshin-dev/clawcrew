@@ -1,146 +1,57 @@
 {
-  "project": "claw-network",
-  "description": "Messenger-based fully autonomous AI multi-agent software development ecosystem",
-  "version": "0.1.0",
+  "project": "clawcrew",
+  "description": "Fix critical wiring issues identified by architect/security/code/critic reviews",
+  "version": "0.2.0",
   "stories": [
     {
-      "id": "US-001",
-      "title": "Core Orchestrator Engine",
+      "id": "US-011",
+      "title": "Wire LLM into BaseAgent",
       "priority": 1,
       "passes": false,
-      "description": "Central event bus and agent lifecycle manager that receives agendas and routes them to agent teams",
       "acceptanceCriteria": [
-        "OrchestrationEngine class exists at src/core/engine.ts with start/stop/submitAgenda methods",
-        "EventBus class at src/core/event-bus.ts supports pub/sub with typed events",
-        "AgentRegistry at src/core/registry.ts can register/unregister/lookup agents by role",
-        "Unit tests pass: tests/core/engine.test.ts, event-bus.test.ts, registry.test.ts",
-        "TypeScript compiles with zero errors"
+        "BaseAgent has setRouter(router: LLMRouter) method",
+        "BaseAgent has protected callLLM(systemPrompt, userPrompt, complexity?) method that calls router.route()",
+        "npx tsc --noEmit passes with 0 errors",
+        "npx vitest run passes all existing tests"
       ]
     },
     {
-      "id": "US-002",
-      "title": "Agent Role System & Persona Framework",
+      "id": "US-012",
+      "title": "Wire Sandbox Security (Interceptor + PolicyEngine into Executor)",
       "priority": 2,
       "passes": false,
-      "description": "Define agent roles (researcher, architect, developer, critic, PM, QA, security, etc.) with configurable personas and capabilities",
       "acceptanceCriteria": [
-        "BaseAgent abstract class at src/agents/base.ts with think/act/speak/listen methods",
-        "At least 12 specialized agent roles defined in src/agents/roles/ (researcher, architect, developer, critic, pm, qa, security, designer, analyst, mediator, devops, scrum-master)",
-        "AgentPersona interface supports name, expertise, personality traits, decision style",
-        "Agent capability matrix in config/agent-capabilities.json maps roles to allowed actions",
-        "Unit tests verify each role's persona loads and base methods are callable"
+        "SandboxExecutor.execute() calls CommandInterceptor.intercept() before spawning process",
+        "Blocked commands return exitCode 126 without spawning shell",
+        "Secret env vars stripped from child process env",
+        "Output size limited to 10MB",
+        "npx vitest run tests/sandbox/ passes"
       ]
     },
     {
-      "id": "US-003",
-      "title": "Messenger Adapters (Slack + Telegram)",
+      "id": "US-013",
+      "title": "Build Orchestration Loop in Engine",
       "priority": 3,
       "passes": false,
-      "description": "Pluggable messenger adapters that receive user agendas and broadcast agent discussions",
       "acceptanceCriteria": [
-        "MessengerAdapter interface at src/messenger/adapter.ts with connect/send/listen/createThread methods",
-        "SlackAdapter at src/messenger/slack.ts implements adapter using @slack/bolt SDK",
-        "TelegramAdapter at src/messenger/telegram.ts implements adapter using grammy SDK",
-        "Adapter factory at src/messenger/factory.ts creates adapters from config",
-        "Integration test stubs verify message sending/receiving lifecycle"
+        "AgendaSubmitted listener spawns agents via AgentFactory",
+        "Engine calls agent.setRouter() on created agents",
+        "connectMessengers() calls createAdapter() and adapter.connect()",
+        "Engine exposes runAgentCycle(projectId) that drives think/act",
+        "npx tsc --noEmit passes"
       ]
     },
     {
-      "id": "US-004",
-      "title": "Discussion & Debate Protocol",
+      "id": "US-014",
+      "title": "Fix CLI Submit + DebateProtocol + PhaseManager",
       "priority": 4,
       "passes": false,
-      "description": "Structured protocol for agents to discuss, debate, reach consensus, and escalate deadlocks",
       "acceptanceCriteria": [
-        "DiscussionThread class at src/orchestrator/discussion.ts manages multi-agent conversations",
-        "DebateProtocol at src/orchestrator/debate.ts implements propose/argue/counter/vote cycle",
-        "ConsensusEngine at src/orchestrator/consensus.ts tracks confidence scores and detects agreement/deadlock",
-        "JudgeAgent at src/agents/roles/judge.ts breaks deadlocks with reasoned decisions",
-        "Tests verify: 3-agent debate reaches consensus within 5 rounds, deadlock triggers judge intervention"
-      ]
-    },
-    {
-      "id": "US-005",
-      "title": "Task Pipeline & SDLC Phases",
-      "priority": 5,
-      "passes": false,
-      "description": "End-to-end pipeline from agenda to deployment: research -> plan -> design -> code -> test -> review -> deploy",
-      "acceptanceCriteria": [
-        "Pipeline class at src/orchestrator/pipeline.ts defines 7 SDLC phases with entry/exit criteria",
-        "PhaseManager at src/orchestrator/phase-manager.ts transitions between phases based on gate conditions",
-        "TaskBoard at src/orchestrator/task-board.ts tracks tasks across phases with status (todo/in-progress/review/done)",
-        "Each phase has a designated agent team composition defined in config/phase-teams.json",
-        "Tests verify full pipeline traversal from RESEARCH to DEPLOY with mock agents"
-      ]
-    },
-    {
-      "id": "US-006",
-      "title": "Memory & Context Engine",
-      "priority": 6,
-      "passes": false,
-      "description": "Persistent memory system for agents to retain project context, decisions, and learnings across sessions",
-      "acceptanceCriteria": [
-        "MemoryStore at src/memory/store.ts with save/query/forget/summarize methods",
-        "FactExtractor at src/memory/fact-extractor.ts extracts structured facts from conversations",
-        "DecisionLog at src/memory/decision-log.ts records architectural decisions with rationale",
-        "ProjectContext at src/memory/project-context.ts aggregates codebase state + conversation history",
-        "Memory persists to disk (JSON/SQLite) and survives process restart"
-      ]
-    },
-    {
-      "id": "US-007",
-      "title": "Sandbox & Policy Engine",
-      "priority": 7,
-      "passes": false,
-      "description": "Security sandbox for agent code execution with policy-based command filtering",
-      "acceptanceCriteria": [
-        "PolicyEngine at src/sandbox/policy-engine.ts validates commands against allowlist/denylist rules",
-        "CommandInterceptor at src/sandbox/interceptor.ts blocks destructive commands (rm -rf, DROP TABLE, etc.)",
-        "SandboxExecutor at src/sandbox/executor.ts runs code in isolated subprocess with resource limits",
-        "Policy rules configurable via config/policies.json",
-        "Tests verify: destructive commands are blocked, safe commands pass, resource limits enforced"
-      ]
-    },
-    {
-      "id": "US-008",
-      "title": "LLM Provider Integration",
-      "priority": 8,
-      "passes": false,
-      "description": "Multi-model routing to Claude, GPT, Gemini with cost-aware selection",
-      "acceptanceCriteria": [
-        "LLMRouter at src/core/llm-router.ts routes requests based on task complexity and model strengths",
-        "Provider adapters for Claude (Anthropic SDK), OpenAI, and Google Gemini at src/core/providers/",
-        "CostTracker at src/core/cost-tracker.ts estimates and logs token usage per agent per task",
-        "Fallback logic: if primary provider fails, automatically retry with secondary",
-        "Config at config/llm-config.json defines model preferences per agent role"
-      ]
-    },
-    {
-      "id": "US-009",
-      "title": "CLI Entry Point & Configuration",
-      "priority": 9,
-      "passes": false,
-      "description": "CLI to start the system, configure messenger connections, and manage agent teams",
-      "acceptanceCriteria": [
-        "CLI entry at src/cli.ts with commands: start, stop, status, config, submit-agenda",
-        "YAML/JSON config loader at src/core/config.ts reads from config/default.yaml",
-        "Environment variable override support for secrets (SLACK_TOKEN, TELEGRAM_TOKEN, API keys)",
-        "README.md with quickstart guide, architecture diagram description, and configuration reference",
-        "npm start launches the orchestrator and connects to configured messengers"
-      ]
-    },
-    {
-      "id": "US-010",
-      "title": "Continuous Improvement Loop",
-      "priority": 10,
-      "passes": false,
-      "description": "Self-improvement mechanism where agents review their own output, identify improvement opportunities, and create follow-up tasks",
-      "acceptanceCriteria": [
-        "RetrospectiveAgent at src/agents/roles/retrospective.ts analyzes completed work for improvement areas",
-        "ImprovementTracker at src/orchestrator/improvement.ts maintains backlog of self-identified improvements",
-        "AutoSprintPlanner at src/orchestrator/sprint-planner.ts prioritizes improvements into next sprint",
-        "Feedback loop: deploy -> monitor -> analyze -> plan -> implement cycle defined in pipeline",
-        "Tests verify: completed task generates at least 1 improvement suggestion"
+        "CLI submit does NOT call engine.stop() after submitting",
+        "DebateProtocol uses real BaseAgent think() for deliberation",
+        "PhaseManager.startPhase() does NOT emit ErrorOccurred for info messages",
+        "npx tsc --noEmit passes",
+        "npx vitest run passes all tests"
       ]
     }
   ]

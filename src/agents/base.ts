@@ -2,6 +2,7 @@ import { nanoid } from 'nanoid';
 import { AgentRole, AgentStatus } from '../core/types.js';
 import type { Message } from '../core/types.js';
 import type { AgentPersona, ThinkContext, Thought, ActionResult } from './persona.js';
+import type { LLMRouter, LlmResponse, TaskComplexity } from '../core/llm-router.js';
 
 export { AgentRole, AgentStatus };
 
@@ -19,12 +20,43 @@ export abstract class BaseAgent {
   /** Inbox of received messages for this agent's current session. */
   protected readonly inbox: Message[] = [];
 
+  /** LLM router — injected by the orchestration engine after creation. */
+  private _router: LLMRouter | undefined;
+
   constructor(role: AgentRole, persona: AgentPersona, name?: string) {
     this.id = nanoid();
     this.role = role;
     this.persona = persona;
     this.name = name ?? persona.name;
     this.status = AgentStatus.IDLE;
+  }
+
+  /** Inject the LLM router so this agent can make LLM calls. */
+  setRouter(router: LLMRouter): void {
+    this._router = router;
+  }
+
+  /** Whether an LLM router has been wired. */
+  get hasRouter(): boolean {
+    return this._router !== undefined;
+  }
+
+  /**
+   * Call the LLM with the agent's persona as system prompt.
+   * Returns the LLM response, or undefined if no router is wired.
+   */
+  protected async callLLM(
+    userPrompt: string,
+    complexity: TaskComplexity = 'medium',
+    systemPromptOverride?: string,
+  ): Promise<LlmResponse | undefined> {
+    if (this._router === undefined) return undefined;
+    return this._router.route({
+      prompt: userPrompt,
+      systemPrompt: systemPromptOverride ?? this.persona.systemPrompt,
+      agentRole: this.role,
+      taskComplexity: complexity,
+    });
   }
 
   // ---------------------------------------------------------------------------

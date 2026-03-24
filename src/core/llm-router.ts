@@ -70,16 +70,36 @@ const DEFAULT_ROUTING: RoutingConfig = {
 // ---------------------------------------------------------------------------
 
 export class LLMRouter {
-  private readonly providers: Map<string, LlmProvider>;
+  private readonly providerCache = new Map<string, LlmProvider>();
   private readonly routing: RoutingConfig;
 
   constructor(routing?: RoutingConfig) {
     this.routing = routing ?? DEFAULT_ROUTING;
-    this.providers = new Map<string, LlmProvider>([
-      ['anthropic', new AnthropicProvider()],
-      ['openai', new OpenAIProvider()],
-      ['google', new GeminiProvider()],
-    ]);
+  }
+
+  private getProvider(name: string): LlmProvider {
+    let provider = this.providerCache.get(name);
+    if (provider !== undefined) return provider;
+
+    switch (name) {
+      case 'anthropic':
+        provider = new AnthropicProvider();
+        break;
+      case 'openai':
+        provider = new OpenAIProvider();
+        break;
+      case 'google':
+        provider = new GeminiProvider();
+        break;
+      default:
+        throw new Error(`Unknown provider: ${name}`);
+    }
+    this.providerCache.set(name, provider);
+    return provider;
+  }
+
+  get providers(): Map<string, LlmProvider> {
+    return this.providerCache;
   }
 
   async route(request: LlmRequest): Promise<LlmResponse> {
@@ -96,7 +116,7 @@ export class LLMRouter {
       ? { ...request, model: request.model }
       : { ...request, model: primary.model };
 
-    const provider = this.providers.get(primary.provider);
+    const provider = this.getProvider(primary.provider);
     if (provider === undefined) {
       throw new Error(`Provider not found: ${primary.provider}`);
     }
@@ -105,7 +125,7 @@ export class LLMRouter {
       return await provider.complete(primaryRequest);
     } catch (primaryError) {
       // Fallback to secondary provider
-      const fallbackProvider = this.providers.get(secondary.provider);
+      const fallbackProvider = this.getProvider(secondary.provider);
       if (fallbackProvider === undefined) {
         throw primaryError;
       }
@@ -119,7 +139,7 @@ export class LLMRouter {
     const responses: LlmResponse[] = [];
 
     for (const pair of criticalConfig.providers) {
-      const provider = this.providers.get(pair.provider);
+      const provider = this.getProvider(pair.provider);
       if (provider === undefined) continue;
       try {
         const resp = await provider.complete({ ...request, model: pair.model });

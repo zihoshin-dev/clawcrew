@@ -27,19 +27,14 @@ export class PhaseManager {
 
   async startPhase(phase: Phase): Promise<void> {
     const config = this.pipeline.getPhaseConfig(phase);
-    const missingRoles: AgentRole[] = config.requiredRoles;
 
-    // Surface the required team composition via the event bus
-    // (actual agent assembly is handled by the orchestration engine)
-    if (missingRoles.length > 0) {
-      // Emit a synthetic log via ErrorOccurred so callers can trace team assembly
-      // without coupling PhaseManager to specific agent spawning logic.
-      this.eventBus.emit('ErrorOccurred', {
-        context: `PhaseManager.startPhase — assembling team for ${phase}: required roles [${missingRoles.join(', ')}]`,
-        error: new Error(`Phase ${phase} starting — assembling required roles`),
-        occurredAt: new Date(),
-      });
-    }
+    // Emit PhaseChanged to signal the orchestration engine to assemble the team
+    this.eventBus.emit('PhaseChanged', {
+      projectId: this.activeProjectId,
+      previousPhase: this.pipeline.currentPhase,
+      currentPhase: phase,
+      changedAt: new Date(),
+    });
 
     if (!this.artifacts.has(phase)) {
       this.artifacts.set(phase, []);

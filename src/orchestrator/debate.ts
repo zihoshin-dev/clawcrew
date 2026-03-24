@@ -35,18 +35,13 @@ export interface DebateResult {
 }
 
 /**
- * Minimal interface that DebateProtocol requires from an agent.
- * The real BaseAgent class (once created) can implement this or be a superset.
+ * Minimal interface that DebateProtocol requires from a participant.
+ * The real BaseAgent class satisfies this via think().
  */
-export interface BaseAgent {
+export interface DebateParticipant {
   id: string;
   name: string;
   role: string;
-
-  /**
-   * Ask the agent to propose or argue a position on the topic.
-   * Returns a position string and a confidence score [0, 1].
-   */
   deliberate(
     topic: string,
     phase: DebatePhase,
@@ -77,7 +72,7 @@ export class DebateProtocol {
 
   async startDebate(
     topic: string,
-    participants: BaseAgent[],
+    participants: DebateParticipant[],
     maxRounds: number,
   ): Promise<DebateResult> {
     const debateId = nanoid();
