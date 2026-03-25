@@ -67,6 +67,36 @@ describe('DebateProtocol', () => {
       expect(result.finalDecision).toBeUndefined();
     });
 
+    it('detects oscillating deadlock (A,B,A,B stride-2 pattern)', async () => {
+      // Two agents swap positions each round: round1=[A,B], round2=[B,A], round3=[A,B]...
+      // Never reaches consensus (50/50 split below 70% threshold).
+      // Consecutive rounds always differ (stale=0), but stride-2 matches → oscillation.
+      let round = 0;
+      const agents: import('../../src/orchestrator/debate.js').DebateParticipant[] = [
+        {
+          id: 'a1',
+          name: 'Agent-a1',
+          role: 'DEVELOPER',
+          async deliberate() {
+            round++;
+            return { position: round % 2 === 1 ? 'option-A' : 'option-B', argument: 'arg', confidence: 0.9 };
+          },
+        },
+        {
+          id: 'a2',
+          name: 'Agent-a2',
+          role: 'DEVELOPER',
+          async deliberate() {
+            return { position: round % 2 === 1 ? 'option-B' : 'option-A', argument: 'arg', confidence: 0.9 };
+          },
+        },
+      ];
+      const result = await protocol.startDebate('Oscillating topic', agents, 20);
+      expect(result.outcome).toBe('deadlock');
+      // Should exit early due to oscillation detection, well before 20 rounds
+      expect(result.rounds.length).toBeLessThan(20);
+    });
+
     it('closes the thread even on deadlock', async () => {
       const agents = [makeAgent('a1', 'X'), makeAgent('a2', 'Y'), makeAgent('a3', 'Z')];
       const result = await protocol.startDebate('Stuck', agents, 4);

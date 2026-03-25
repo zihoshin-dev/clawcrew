@@ -2,7 +2,7 @@ import { nanoid } from 'nanoid';
 import { createEventBus, EventBus } from './event-bus.js';
 import type { AigoraEvents } from './event-bus.js';
 import { AgentRegistry } from './registry.js';
-import { AgentStatus, Phase } from './types.js';
+import { AgentStatus, Phase, AgentRole } from './types.js';
 import type { AigoraConfig, Project } from './types.js';
 import { LLMRouter } from './llm-router.js';
 import { AgentFactory } from '../agents/factory.js';
@@ -12,7 +12,6 @@ import type { MessengerAdapter } from '../messenger/adapter.js';
 import { createLogger } from './logger.js';
 import type { Logger } from './logger.js';
 import { TeamSizer } from '../orchestrator/team-sizer.js';
-import type { AgentRole } from './types.js';
 import { CycleGuard } from '../orchestrator/cycle-guard.js';
 import phaseTeamsJson from '../../config/phase-teams.json' assert { type: 'json' };
 import type { ProjectStore } from '../persistence/types.js';
@@ -315,8 +314,25 @@ export class OrchestrationEngine {
       }
     });
 
-    this.bus.on('DeadlockDetected', ({ projectId, phase, involvedAgents }) => {
+    this.bus.on('DeadlockDetected', async ({ projectId, phase, involvedAgents }) => {
       this.logger.warn(`[DeadlockDetected] project=${projectId} phase=${phase} agents=${involvedAgents.join(',')}`);
+      const judge = AgentFactory.create(AgentRole.JUDGE);
+      judge.setRouter(this.llmRouter);
+      const project = this.projects.get(projectId);
+      if (project) {
+        try {
+          const thought = await judge.think({
+            projectId,
+            phase: project.phase,
+            agenda: `DEADLOCK RESOLUTION: ${project.agenda}`,
+            recentMessages: project.messages.slice(-30),
+          });
+          const verdict = await judge.act(thought);
+          this.logger.info(`[Judge Verdict] ${verdict.output.slice(0, 200)}`);
+        } catch (err) {
+          this.logger.error(`[Judge] Failed to render verdict: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
     });
 
     this.bus.on('ErrorOccurred', ({ error, context, projectId }) => {

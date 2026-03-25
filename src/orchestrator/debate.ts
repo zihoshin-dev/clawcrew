@@ -61,6 +61,15 @@ function positionsConverged(prev: AgentPosition[], curr: AgentPosition[]): boole
   return changed === 0;
 }
 
+/** Detect stride-2 oscillation: A,B,A,B alternating deadlock. */
+function positionsOscillating(history: AgentPosition[][], current: AgentPosition[]): boolean {
+  if (history.length < 2) return false;
+  const twoBack = history[history.length - 2];
+  if (twoBack === undefined || twoBack.length !== current.length) return false;
+  const prevMap = new Map(twoBack.map((p) => [p.agentId, p.position]));
+  return current.every((c) => prevMap.get(c.agentId) === c.position);
+}
+
 // ---------------------------------------------------------------------------
 // DebateProtocol
 // ---------------------------------------------------------------------------
@@ -82,6 +91,7 @@ export class DebateProtocol {
     const phases: DebatePhase[] = ['PROPOSE', 'ARGUE', 'COUNTER', 'VOTE'];
     let prevPositions: AgentPosition[] = [];
     let staleCount = 0;
+    const roundHistory: AgentPosition[][] = [];
 
     for (let roundNum = 1; roundNum <= maxRounds; roundNum++) {
       const phase = phases[(roundNum - 1) % phases.length] ?? 'PROPOSE';
@@ -147,6 +157,14 @@ export class DebateProtocol {
         staleCount = 0;
       }
       prevPositions = positions;
+
+      // Stride-2 oscillation: A,B,A,B alternating deadlock (check before push)
+      if (positionsOscillating(roundHistory, positions)) {
+        roundHistory.push(positions);
+        break;
+      }
+
+      roundHistory.push(positions);
 
       if (staleCount >= DEADLOCK_STALE_ROUNDS) {
         break;

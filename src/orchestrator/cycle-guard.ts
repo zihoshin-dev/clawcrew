@@ -93,15 +93,36 @@ export class CycleGuard {
 
   private _detectOscillation(): boolean {
     const outputs = this.recentOutputs;
-    // All consecutive pairs must exceed threshold to declare oscillation
     const tokenSets = outputs.map(tokenize);
+
+    // Consecutive similarity: A,A,A pattern
+    let allConsecutiveSimilar = true;
     for (let i = 1; i < tokenSets.length; i++) {
       const prev = tokenSets[i - 1];
       const curr = tokenSets[i];
       if (prev === undefined || curr === undefined) continue;
-      const sim = jaccardSimilarity(prev, curr);
-      if (sim < this.config.oscillationThreshold) return false;
+      if (jaccardSimilarity(prev, curr) < this.config.oscillationThreshold) {
+        allConsecutiveSimilar = false;
+        break;
+      }
     }
-    return true;
+    if (allConsecutiveSimilar) return true;
+
+    // Stride-2 similarity: A,B,A,B alternating pattern
+    if (tokenSets.length >= 3) {
+      let allStrideTwoSimilar = true;
+      for (let i = 2; i < tokenSets.length; i++) {
+        const twoBack = tokenSets[i - 2];
+        const curr = tokenSets[i];
+        if (twoBack === undefined || curr === undefined) continue;
+        if (jaccardSimilarity(twoBack, curr) < this.config.oscillationThreshold) {
+          allStrideTwoSimilar = false;
+          break;
+        }
+      }
+      if (allStrideTwoSimilar) return true;
+    }
+
+    return false;
   }
 }

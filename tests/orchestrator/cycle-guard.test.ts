@@ -79,4 +79,24 @@ describe('CycleGuard', () => {
     const { reason } = guard.shouldStop();
     expect(reason).toMatch(/threshold/i);
   });
+
+  it('detects stride-2 oscillation (A,B,A pattern)', () => {
+    const outputA = 'the agent decided to implement a caching layer for database queries to improve performance';
+    const outputB = 'the agent chose to refactor the authentication module using jwt tokens for security';
+    // A, B, A — stride-2: outputs[0] and outputs[2] are identical → oscillation
+    guard.recordCycle(outputA);
+    guard.recordCycle(outputB);
+    guard.recordCycle(outputA);
+    const { stop, reason } = guard.shouldStop();
+    expect(stop).toBe(true);
+    expect(reason).toMatch(/oscillation/i);
+  });
+
+  it('does not flag stride-2 oscillation for truly diverse outputs', () => {
+    guard.recordCycle('researching database options comparing postgres versus mysql for the project');
+    guard.recordCycle('implementing jwt authentication service with refresh token rotation logic');
+    guard.recordCycle('writing unit tests for payment processing module with stripe integration');
+    const { stop } = guard.shouldStop();
+    expect(stop).toBe(false);
+  });
 });
