@@ -9,21 +9,30 @@ export class InnovatorAgent extends BaseAgent {
   }
 
   async think(context: ThinkContext): Promise<Thought> {
+    const prompt = `You are an innovation catalyst. Challenge assumptions and explore unconventional solution spaces to find breakthrough approaches for the following:\n\nAgenda: ${context.agenda}\nPhase: ${context.phase}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
+    const reasoning = llmResponse?.content
+      ?? 'Challenging assumptions and exploring unconventional solution spaces to find breakthrough approaches.';
+
     return this.buildThought(
       context,
       `Creative problem-solving for: ${context.agenda}`,
-      'Challenging assumptions and exploring unconventional solution spaces to find breakthrough approaches.',
-      0.72,
+      reasoning,
+      llmResponse ? 0.77 : 0.72,
       'produce_innovation_brief',
-      { phase: context.phase },
+      { phase: context.phase, usedLLM: !!llmResponse },
     );
   }
 
   async act(thought: Thought): Promise<ActionResult> {
+    const prompt = `Based on this innovation analysis, produce an innovation brief with creative ideas and disruption opportunities:\n\n${thought.reasoning}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
     return this.buildResult(
       thought.suggestedAction,
-      `Innovation brief stub for "${thought.summary}". LLM call will be wired here.`,
-      { ideas: [], disruptionOpportunities: [] },
+      llmResponse?.content ?? `Innovation brief stub for "${thought.summary}".`,
+      { ideas: [], disruptionOpportunities: [], usedLLM: !!llmResponse },
     );
   }
 

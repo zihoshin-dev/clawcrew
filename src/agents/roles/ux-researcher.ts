@@ -9,21 +9,30 @@ export class UxResearcherAgent extends BaseAgent {
   }
 
   async think(context: ThinkContext): Promise<Thought> {
+    const prompt = `You are a UX researcher. Synthesise user behaviours, needs, and pain points into personas and journey maps that ground decisions in reality for the following:\n\nAgenda: ${context.agenda}\nPhase: ${context.phase}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
+    const reasoning = llmResponse?.content
+      ?? 'Synthesising user behaviours, needs, and pain points into personas and journey maps that ground decisions in reality.';
+
     return this.buildThought(
       context,
       `User research for: ${context.agenda}`,
-      'Synthesising user behaviours, needs, and pain points into personas and journey maps that ground decisions in reality.',
-      0.79,
+      reasoning,
+      llmResponse ? 0.84 : 0.79,
       'produce_user_research_report',
-      { phase: context.phase },
+      { phase: context.phase, usedLLM: !!llmResponse },
     );
   }
 
   async act(thought: Thought): Promise<ActionResult> {
+    const prompt = `Based on this user research analysis, produce a report with user personas, journey maps, and prioritised pain points:\n\n${thought.reasoning}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
     return this.buildResult(
       thought.suggestedAction,
-      `User research report stub for "${thought.summary}". LLM call will be wired here.`,
-      { personas: [], journeyMaps: [], painPoints: [] },
+      llmResponse?.content ?? `User research report stub for "${thought.summary}".`,
+      { personas: [], journeyMaps: [], painPoints: [], usedLLM: !!llmResponse },
     );
   }
 

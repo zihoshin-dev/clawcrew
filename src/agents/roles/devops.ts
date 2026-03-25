@@ -9,21 +9,30 @@ export class DevOpsAgent extends BaseAgent {
   }
 
   async think(context: ThinkContext): Promise<Thought> {
+    const prompt = `You are a DevOps engineer. Assess the deployment pipeline, infrastructure requirements, observability needs, and reliability targets for the following:\n\nAgenda: ${context.agenda}\nPhase: ${context.phase}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
+    const reasoning = llmResponse?.content
+      ?? 'Assessing deployment pipeline, infrastructure requirements, observability needs, and reliability targets.';
+
     return this.buildThought(
       context,
       `Infrastructure plan for: ${context.agenda}`,
-      'Assessing deployment pipeline, infrastructure requirements, observability needs, and reliability targets.',
-      0.81,
+      reasoning,
+      llmResponse ? 0.85 : 0.81,
       'configure_pipeline',
-      { phase: context.phase },
+      { phase: context.phase, usedLLM: !!llmResponse },
     );
   }
 
   async act(thought: Thought): Promise<ActionResult> {
+    const prompt = `Based on this infrastructure assessment, produce a spec covering pipeline configuration, infrastructure components, and monitoring setup:\n\n${thought.reasoning}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
     return this.buildResult(
       thought.suggestedAction,
-      `Infrastructure spec stub for "${thought.summary}". LLM call will be wired here.`,
-      { pipeline: [], infrastructure: [], monitors: [] },
+      llmResponse?.content ?? `Infrastructure spec stub for "${thought.summary}".`,
+      { pipeline: [], infrastructure: [], monitors: [], usedLLM: !!llmResponse },
     );
   }
 

@@ -9,21 +9,30 @@ export class TechWriterAgent extends BaseAgent {
   }
 
   async think(context: ThinkContext): Promise<Thought> {
+    const prompt = `You are a technical writer. Identify the audience, information architecture, and coverage gaps to produce documentation that actually gets used for the following:\n\nAgenda: ${context.agenda}\nPhase: ${context.phase}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
+    const reasoning = llmResponse?.content
+      ?? 'Identifying audience, information architecture, and coverage gaps to produce documentation that actually gets used.';
+
     return this.buildThought(
       context,
       `Documentation planning for: ${context.agenda}`,
-      'Identifying audience, information architecture, and coverage gaps to produce documentation that actually gets used.',
-      0.83,
+      reasoning,
+      llmResponse ? 0.87 : 0.83,
       'produce_documentation',
-      { phase: context.phase },
+      { phase: context.phase, usedLLM: !!llmResponse },
     );
   }
 
   async act(thought: Thought): Promise<ActionResult> {
+    const prompt = `Based on this documentation plan, produce a structured documentation outline with sections and audience profiles:\n\n${thought.reasoning}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
     return this.buildResult(
       thought.suggestedAction,
-      `Documentation stub for "${thought.summary}". LLM call will be wired here.`,
-      { sections: [], audienceProfiles: [] },
+      llmResponse?.content ?? `Documentation stub for "${thought.summary}".`,
+      { sections: [], audienceProfiles: [], usedLLM: !!llmResponse },
     );
   }
 

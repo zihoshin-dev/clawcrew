@@ -9,21 +9,30 @@ export class QAAgent extends BaseAgent {
   }
 
   async think(context: ThinkContext): Promise<Thought> {
+    const prompt = `You are a QA engineer. Define acceptance criteria, test scenarios, edge cases, and automation strategy for the following:\n\nAgenda: ${context.agenda}\nPhase: ${context.phase}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
+    const reasoning = llmResponse?.content
+      ?? 'Defining acceptance criteria, test scenarios, edge cases, and automation strategy before implementation begins.';
+
     return this.buildThought(
       context,
       `Test strategy for: ${context.agenda}`,
-      'Defining acceptance criteria, test scenarios, edge cases, and automation strategy before implementation begins.',
-      0.82,
+      reasoning,
+      llmResponse ? 0.86 : 0.82,
       'write_test_plan',
-      { phase: context.phase },
+      { phase: context.phase, usedLLM: !!llmResponse },
     );
   }
 
   async act(thought: Thought): Promise<ActionResult> {
+    const prompt = `Based on this test strategy, produce a detailed test plan with concrete test cases, automation targets, and quality gates:\n\n${thought.reasoning}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
     return this.buildResult(
       thought.suggestedAction,
-      `Test plan stub for "${thought.summary}". LLM call will be wired here.`,
-      { testCases: [], automationTargets: [], qualityGates: [] },
+      llmResponse?.content ?? `Test plan stub for "${thought.summary}".`,
+      { testCases: [], automationTargets: [], qualityGates: [], usedLLM: !!llmResponse },
     );
   }
 

@@ -11,21 +11,30 @@ export class RetrospectiveAgent extends BaseAgent {
   }
 
   async think(context: ThinkContext): Promise<Thought> {
+    const prompt = `You are a retrospective facilitator. Review what went well, what did not, and why. Identify systemic patterns and convert insights into measurable improvements:\n\nAgenda: ${context.agenda}\nPhase: ${context.phase}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
+    const reasoning = llmResponse?.content
+      ?? 'Reviewing what went well, what did not, and why. Identifying systemic patterns and converting insights into measurable improvements.';
+
     return this.buildThought(
       context,
       `Retrospective for: ${context.agenda}`,
-      'Reviewing what went well, what did not, and why. Identifying systemic patterns and converting insights into measurable improvements.',
-      0.73,
+      reasoning,
+      llmResponse ? 0.78 : 0.73,
       'facilitate_retrospective',
-      { phase: context.phase },
+      { phase: context.phase, usedLLM: !!llmResponse },
     );
   }
 
   async act(thought: Thought): Promise<ActionResult> {
+    const prompt = `Based on this retrospective analysis, produce a structured report with what went well, areas for improvement, and concrete action items:\n\n${thought.reasoning}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
     return this.buildResult(
       thought.suggestedAction,
-      `Retrospective report stub for "${thought.summary}". LLM call will be wired here.`,
-      { wentWell: [], improvements: [], actionItems: [] },
+      llmResponse?.content ?? `Retrospective report stub for "${thought.summary}".`,
+      { wentWell: [], improvements: [], actionItems: [], usedLLM: !!llmResponse },
     );
   }
 

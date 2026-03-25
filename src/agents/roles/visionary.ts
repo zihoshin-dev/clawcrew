@@ -9,21 +9,30 @@ export class VisionaryAgent extends BaseAgent {
   }
 
   async think(context: ThinkContext): Promise<Thought> {
+    const prompt = `You are a visionary thinker. Scan weak signals, emerging trends, and second-order effects to envision the future state for the following:\n\nAgenda: ${context.agenda}\nPhase: ${context.phase}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
+    const reasoning = llmResponse?.content
+      ?? 'Scanning weak signals, emerging trends, and second-order effects to envision the future state.';
+
     return this.buildThought(
       context,
       `Future vision for: ${context.agenda}`,
-      'Scanning weak signals, emerging trends, and second-order effects to envision the future state.',
-      0.7,
+      reasoning,
+      llmResponse ? 0.75 : 0.7,
       'produce_vision_statement',
-      { phase: context.phase },
+      { phase: context.phase, usedLLM: !!llmResponse },
     );
   }
 
   async act(thought: Thought): Promise<ActionResult> {
+    const prompt = `Based on this future-oriented analysis, produce a compelling vision statement with key trends and plausible future scenarios:\n\n${thought.reasoning}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
     return this.buildResult(
       thought.suggestedAction,
-      `Vision statement stub for "${thought.summary}". LLM call will be wired here.`,
-      { trends: [], scenarios: [] },
+      llmResponse?.content ?? `Vision statement stub for "${thought.summary}".`,
+      { trends: [], scenarios: [], usedLLM: !!llmResponse },
     );
   }
 

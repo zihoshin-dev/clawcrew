@@ -9,21 +9,30 @@ export class CriticAgent extends BaseAgent {
   }
 
   async think(context: ThinkContext): Promise<Thought> {
+    const prompt = `You are a critical analyst. Stress-test the following proposal by identifying hidden assumptions, edge cases, failure modes, and unintended consequences:\n\nAgenda: ${context.agenda}\nPhase: ${context.phase}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
+    const reasoning = llmResponse?.content
+      ?? 'Stress-testing proposals: identifying hidden assumptions, edge cases, failure modes, and unintended consequences.';
+
     return this.buildThought(
       context,
       `Critical analysis of: ${context.agenda}`,
-      'Stress-testing proposals: identifying hidden assumptions, edge cases, failure modes, and unintended consequences.',
-      0.85,
+      reasoning,
+      llmResponse ? 0.88 : 0.85,
       'critique_proposal',
-      { phase: context.phase },
+      { phase: context.phase, usedLLM: !!llmResponse },
     );
   }
 
   async act(thought: Thought): Promise<ActionResult> {
+    const prompt = `Based on this critical analysis, produce a structured critique report listing risks, assumptions, and edge cases with severity ratings:\n\n${thought.reasoning}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
     return this.buildResult(
       thought.suggestedAction,
-      `Critique report stub for "${thought.summary}". LLM call will be wired here.`,
-      { risks: [], assumptions: [], edgeCases: [] },
+      llmResponse?.content ?? `Critique report stub for "${thought.summary}".`,
+      { risks: [], assumptions: [], edgeCases: [], usedLLM: !!llmResponse },
     );
   }
 

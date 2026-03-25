@@ -9,21 +9,30 @@ export class ArchitectAgent extends BaseAgent {
   }
 
   async think(context: ThinkContext): Promise<Thought> {
+    const prompt = `You are a software architect. Evaluate the following agenda and identify system components, interfaces, trade-offs, scalability concerns, and maintainability risks:\n\nAgenda: ${context.agenda}\nPhase: ${context.phase}`;
+    const llmResponse = await this.callLLM(prompt, 'high');
+
+    const reasoning = llmResponse?.content
+      ?? 'Evaluating system components, interfaces, and trade-offs. Checking for scalability and maintainability concerns.';
+
     return this.buildThought(
       context,
       `Architecture design for: ${context.agenda}`,
-      'Evaluating system components, interfaces, and trade-offs. Checking for scalability and maintainability concerns.',
-      0.8,
+      reasoning,
+      llmResponse ? 0.85 : 0.8,
       'design_system',
-      { phase: context.phase },
+      { phase: context.phase, usedLLM: !!llmResponse },
     );
   }
 
   async act(thought: Thought): Promise<ActionResult> {
+    const prompt = `Based on this architectural analysis, produce a structured Architecture Decision Record (ADR) with components, decisions, and trade-offs:\n\n${thought.reasoning}`;
+    const llmResponse = await this.callLLM(prompt, 'high');
+
     return this.buildResult(
       thought.suggestedAction,
-      `Architecture decision record stub for "${thought.summary}". LLM call will be wired here.`,
-      { components: [], decisions: [], tradeOffs: [] },
+      llmResponse?.content ?? `Architecture decision record stub for "${thought.summary}".`,
+      { components: [], decisions: [], tradeOffs: [], usedLLM: !!llmResponse },
     );
   }
 

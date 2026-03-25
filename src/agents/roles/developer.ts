@@ -9,21 +9,30 @@ export class DeveloperAgent extends BaseAgent {
   }
 
   async think(context: ThinkContext): Promise<Thought> {
+    const prompt = `You are a senior software developer. Break down the following agenda into implementable units, identify test cases, and flag any ambiguous requirements:\n\nAgenda: ${context.agenda}\nPhase: ${context.phase}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
+    const reasoning = llmResponse?.content
+      ?? 'Breaking the task into implementable units, identifying test cases, and flagging ambiguous requirements.';
+
     return this.buildThought(
       context,
       `Implementation plan for: ${context.agenda}`,
-      'Breaking the task into implementable units, identifying test cases, and flagging ambiguous requirements.',
-      0.8,
+      reasoning,
+      llmResponse ? 0.85 : 0.8,
       'write_code',
-      { phase: context.phase },
+      { phase: context.phase, usedLLM: !!llmResponse },
     );
   }
 
   async act(thought: Thought): Promise<ActionResult> {
+    const prompt = `Based on this implementation plan, produce a detailed implementation specification with file structure, key functions, and test stubs:\n\n${thought.reasoning}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
     return this.buildResult(
       thought.suggestedAction,
-      `Implementation stub for "${thought.summary}". LLM call will be wired here.`,
-      { files: [], testFiles: [] },
+      llmResponse?.content ?? `Implementation stub for "${thought.summary}".`,
+      { files: [], testFiles: [], usedLLM: !!llmResponse },
     );
   }
 

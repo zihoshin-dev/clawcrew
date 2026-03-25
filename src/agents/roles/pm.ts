@@ -9,21 +9,30 @@ export class PMAgent extends BaseAgent {
   }
 
   async think(context: ThinkContext): Promise<Thought> {
+    const prompt = `You are a product manager. Translate the following agenda into user stories, acceptance criteria, and a prioritised backlog. Check for scope alignment and business value:\n\nAgenda: ${context.agenda}\nPhase: ${context.phase}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
+    const reasoning = llmResponse?.content
+      ?? 'Translating the agenda into user stories, acceptance criteria, and a prioritised backlog. Checking scope alignment.';
+
     return this.buildThought(
       context,
       `Product requirements for: ${context.agenda}`,
-      'Translating the agenda into user stories, acceptance criteria, and a prioritised backlog. Checking scope alignment.',
-      0.78,
+      reasoning,
+      llmResponse ? 0.83 : 0.78,
       'define_requirements',
-      { phase: context.phase },
+      { phase: context.phase, usedLLM: !!llmResponse },
     );
   }
 
   async act(thought: Thought): Promise<ActionResult> {
+    const prompt = `Based on this product analysis, produce a requirements document with user stories, acceptance criteria, and prioritised milestones:\n\n${thought.reasoning}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
     return this.buildResult(
       thought.suggestedAction,
-      `Requirements document stub for "${thought.summary}". LLM call will be wired here.`,
-      { userStories: [], acceptanceCriteria: [], milestones: [] },
+      llmResponse?.content ?? `Requirements document stub for "${thought.summary}".`,
+      { userStories: [], acceptanceCriteria: [], milestones: [], usedLLM: !!llmResponse },
     );
   }
 

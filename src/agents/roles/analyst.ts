@@ -9,21 +9,30 @@ export class AnalystAgent extends BaseAgent {
   }
 
   async think(context: ThinkContext): Promise<Thought> {
+    const prompt = `You are a data analyst. Define success metrics, identify relevant data sources, and plan a measurement strategy for the following:\n\nAgenda: ${context.agenda}\nPhase: ${context.phase}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
+    const reasoning = llmResponse?.content
+      ?? 'Defining success metrics, identifying data sources, and planning measurement strategy before development begins.';
+
     return this.buildThought(
       context,
       `Data analysis for: ${context.agenda}`,
-      'Defining success metrics, identifying data sources, and planning measurement strategy before development begins.',
-      0.77,
+      reasoning,
+      llmResponse ? 0.82 : 0.77,
       'define_metrics',
-      { phase: context.phase },
+      { phase: context.phase, usedLLM: !!llmResponse },
     );
   }
 
   async act(thought: Thought): Promise<ActionResult> {
+    const prompt = `Based on this analytical framework, produce an analytics report with key metrics, data sources, and actionable insights:\n\n${thought.reasoning}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
     return this.buildResult(
       thought.suggestedAction,
-      `Analytics report stub for "${thought.summary}". LLM call will be wired here.`,
-      { metrics: [], dataSources: [], insights: [] },
+      llmResponse?.content ?? `Analytics report stub for "${thought.summary}".`,
+      { metrics: [], dataSources: [], insights: [], usedLLM: !!llmResponse },
     );
   }
 

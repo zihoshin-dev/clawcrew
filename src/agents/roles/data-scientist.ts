@@ -9,21 +9,30 @@ export class DataScientistAgent extends BaseAgent {
   }
 
   async think(context: ThinkContext): Promise<Thought> {
+    const prompt = `You are a data scientist. Select appropriate statistical methods and ML approaches to extract actionable insights from available data for the following:\n\nAgenda: ${context.agenda}\nPhase: ${context.phase}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
+    const reasoning = llmResponse?.content
+      ?? 'Selecting appropriate statistical methods and ML approaches to extract actionable insights from available data.';
+
     return this.buildThought(
       context,
       `Data analysis for: ${context.agenda}`,
-      'Selecting appropriate statistical methods and ML approaches to extract actionable insights from available data.',
-      0.82,
+      reasoning,
+      llmResponse ? 0.86 : 0.82,
       'produce_data_analysis',
-      { phase: context.phase },
+      { phase: context.phase, usedLLM: !!llmResponse },
     );
   }
 
   async act(thought: Thought): Promise<ActionResult> {
+    const prompt = `Based on this data science analysis, produce a detailed report with insights, recommended models, and visualisation strategies:\n\n${thought.reasoning}`;
+    const llmResponse = await this.callLLM(prompt, 'medium');
+
     return this.buildResult(
       thought.suggestedAction,
-      `Data analysis stub for "${thought.summary}". LLM call will be wired here.`,
-      { insights: [], models: [], visualisations: [] },
+      llmResponse?.content ?? `Data analysis stub for "${thought.summary}".`,
+      { insights: [], models: [], visualisations: [], usedLLM: !!llmResponse },
     );
   }
 

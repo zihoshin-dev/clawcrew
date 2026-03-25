@@ -9,21 +9,30 @@ export class ScrumMasterAgent extends BaseAgent {
   }
 
   async think(context: ThinkContext): Promise<Thought> {
+    const prompt = `You are a Scrum Master. Review team velocity, identify blockers, and plan agile ceremonies for the following:\n\nAgenda: ${context.agenda}\nPhase: ${context.phase}`;
+    const llmResponse = await this.callLLM(prompt, 'low');
+
+    const reasoning = llmResponse?.content
+      ?? 'Reviewing team velocity, identifying blockers, and ensuring agile ceremonies stay purposeful and time-boxed.';
+
     return this.buildThought(
       context,
       `Sprint facilitation for: ${context.agenda}`,
-      'Reviewing team velocity, identifying blockers, and ensuring agile ceremonies stay purposeful and time-boxed.',
-      0.74,
+      reasoning,
+      llmResponse ? 0.79 : 0.74,
       'plan_sprint',
-      { phase: context.phase },
+      { phase: context.phase, usedLLM: !!llmResponse },
     );
   }
 
   async act(thought: Thought): Promise<ActionResult> {
+    const prompt = `Based on this sprint analysis, produce a sprint plan with a clear sprint goal, task breakdown, and identified impediments:\n\n${thought.reasoning}`;
+    const llmResponse = await this.callLLM(prompt, 'low');
+
     return this.buildResult(
       thought.suggestedAction,
-      `Sprint plan stub for "${thought.summary}". LLM call will be wired here.`,
-      { sprintGoal: '', tasks: [], impediments: [] },
+      llmResponse?.content ?? `Sprint plan stub for "${thought.summary}".`,
+      { sprintGoal: '', tasks: [], impediments: [], usedLLM: !!llmResponse },
     );
   }
 
