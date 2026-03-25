@@ -1,5 +1,5 @@
 import { App, LogLevel } from '@slack/bolt';
-import type { MessengerAdapter, IncomingMessage } from './adapter.js';
+import type { MessengerAdapter, IncomingMessage, AgentIdentity } from './adapter.js';
 
 // ---------------------------------------------------------------------------
 // Role → emoji mapping for agent message headers
@@ -110,13 +110,14 @@ export class SlackAdapter implements MessengerAdapter {
     this.connected = false;
   }
 
-  async sendMessage(channel: string, text: string, threadId?: string): Promise<string> {
+  async sendMessage(channel: string, text: string, threadId?: string, identity?: AgentIdentity): Promise<string> {
     await this.rateLimit();
 
     const result = await this.app.client.chat.postMessage({
       channel,
       text,
       ...(threadId !== undefined ? { thread_ts: threadId } : {}),
+      ...(identity !== undefined ? { username: identity.username, icon_emoji: identity.iconEmoji } : {}),
     });
 
     return String(result.ts ?? '');

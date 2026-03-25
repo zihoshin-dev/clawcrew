@@ -2,6 +2,11 @@
 // MessengerAdapter — common interface for all messenger platform adapters
 // ---------------------------------------------------------------------------
 
+export interface AgentIdentity {
+  username: string;
+  iconEmoji: string;
+}
+
 export interface IncomingMessage {
   text: string;
   channel: string;
@@ -22,9 +27,10 @@ export interface MessengerAdapter {
   /**
    * Send a text message to the given channel.
    * Optionally post into an existing thread/reply chain.
+   * When identity is provided, the message is posted with a custom username and icon.
    * Returns the platform-specific message id.
    */
-  sendMessage(channel: string, text: string, threadId?: string): Promise<string>;
+  sendMessage(channel: string, text: string, threadId?: string, identity?: AgentIdentity): Promise<string>;
 
   /**
    * Create a new thread/topic in the given channel with the supplied title.
