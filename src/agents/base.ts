@@ -3,6 +3,7 @@ import { AgentRole, AgentStatus } from '../core/types.js';
 import type { Message } from '../core/types.js';
 import type { AgentPersona, ThinkContext, Thought, ActionResult } from './persona.js';
 import type { LLMRouter, LlmResponse, TaskComplexity } from '../core/llm-router.js';
+import type { ToolRegistry, ToolInput, ToolOutput } from '../tools/index.js';
 
 export { AgentRole, AgentStatus };
 
@@ -23,6 +24,9 @@ export abstract class BaseAgent {
   /** LLM router — injected by the orchestration engine after creation. */
   private _router: LLMRouter | undefined;
 
+  /** Tool registry — optionally injected to enable tool use. */
+  toolRegistry: ToolRegistry | undefined;
+
   constructor(role: AgentRole, persona: AgentPersona, name?: string) {
     this.id = nanoid();
     this.role = role;
@@ -39,6 +43,23 @@ export abstract class BaseAgent {
   /** Whether an LLM router has been wired. */
   get hasRouter(): boolean {
     return this._router !== undefined;
+  }
+
+  /** Inject a tool registry so this agent can invoke tools. */
+  setTools(registry: ToolRegistry): void {
+    this.toolRegistry = registry;
+  }
+
+  /** Invoke a named tool from the registry. Throws if the tool is not found. */
+  protected async useTool(name: string, input: ToolInput): Promise<ToolOutput> {
+    if (this.toolRegistry === undefined) {
+      return { success: false, result: null, error: 'No tool registry wired', duration: 0 };
+    }
+    const tool = this.toolRegistry.get(name);
+    if (tool === undefined) {
+      return { success: false, result: null, error: `Tool not found: ${name}`, duration: 0 };
+    }
+    return tool.execute(input);
   }
 
   /**

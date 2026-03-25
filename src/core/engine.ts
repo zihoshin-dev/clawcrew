@@ -15,6 +15,7 @@ import { TeamSizer } from '../orchestrator/team-sizer.js';
 import type { AgentRole } from './types.js';
 import { CycleGuard } from '../orchestrator/cycle-guard.js';
 import phaseTeamsJson from '../../config/phase-teams.json' assert { type: 'json' };
+import type { ProjectStore } from '../persistence/types.js';
 
 export type { AigoraConfig };
 
@@ -39,18 +40,20 @@ export class OrchestrationEngine {
   private readonly projectAgents: Map<string, BaseAgent[]> = new Map();
   private readonly teamSizer: TeamSizer;
   private readonly cycleGuards: Map<string, CycleGuard> = new Map();
+  private readonly projectStore: ProjectStore | undefined;
 
   private readonly logger: Logger;
   private running = false;
   private startedAt: Date | undefined;
 
-  constructor(config: AigoraConfig) {
+  constructor(config: AigoraConfig, projectStore?: ProjectStore) {
     this.config = config;
     this.bus = createEventBus();
     this.registry = AgentRegistry.getInstance();
     this.llmRouter = new LLMRouter();
     this.logger = createLogger('aigora:engine', config.logLevel ?? 'info');
     this.teamSizer = new TeamSizer(phaseTeamsJson as Record<string, { required: string[]; optional?: string[] }>);
+    this.projectStore = projectStore;
   }
 
   // ---------------------------------------------------------------------------
@@ -118,6 +121,7 @@ export class OrchestrationEngine {
     };
 
     this.projects.set(projectId, project);
+    this.projectStore?.saveProject(project);
 
     this.bus.emit('AgendaSubmitted', {
       projectId,
@@ -246,6 +250,7 @@ export class OrchestrationEngine {
       if (project !== undefined) {
         project.phase = currentPhase;
         project.updatedAt = new Date();
+        this.projectStore?.saveProject(project);
       }
       this.logger.debug(`[PhaseChanged] project=${projectId} ${previousPhase} → ${currentPhase}`);
     });

@@ -3,6 +3,8 @@ import 'dotenv/config';
 import { Command } from 'commander';
 import { loadConfig } from './core/config.js';
 import { OrchestrationEngine } from './core/engine.js';
+import { CostTracker } from './core/cost-tracker.js';
+import { CostReporter } from './dashboard/cost-reporter.js';
 
 const program = new Command();
 
@@ -150,6 +152,21 @@ program
         `  ${agent.id}  role=${agent.role}  name=${agent.name}  status=${agent.status}  model=${agent.model}`,
       );
     }
+  });
+
+// ---------------------------------------------------------------------------
+// cost
+// ---------------------------------------------------------------------------
+
+program
+  .command('cost')
+  .description('Show cost report for all projects or a specific project')
+  .option('-p, --project <id>', 'Filter by project ID')
+  .action((opts: { project?: string }) => {
+    const tracker = new CostTracker();
+    const reporter = new CostReporter(tracker);
+    const report = reporter.generateReport(opts.project);
+    console.log(reporter.formatForCli(report));
   });
 
 program.parse(process.argv);

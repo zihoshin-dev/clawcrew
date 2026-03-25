@@ -3,6 +3,7 @@ import type { LlmProvider } from './providers/base.js';
 import { AnthropicProvider } from './providers/anthropic.js';
 import { OpenAIProvider } from './providers/openai.js';
 import { GeminiProvider } from './providers/gemini.js';
+import type { LlmCache } from './llm-cache.js';
 
 export type TaskComplexity = 'low' | 'medium' | 'high' | 'critical';
 
@@ -72,9 +73,11 @@ const DEFAULT_ROUTING: RoutingConfig = {
 export class LLMRouter {
   private readonly providerCache = new Map<string, LlmProvider>();
   private readonly routing: RoutingConfig;
+  private readonly cache: LlmCache | undefined;
 
-  constructor(routing?: RoutingConfig) {
+  constructor(routing?: RoutingConfig, cache?: LlmCache) {
     this.routing = routing ?? DEFAULT_ROUTING;
+    this.cache = cache;
   }
 
   private getProvider(name: string): LlmProvider {
@@ -112,9 +115,18 @@ export class LLMRouter {
     const secondary = config.secondary;
 
     // Use explicit model override if provided
-    const primaryRequest = request.model !== undefined
-      ? { ...request, model: request.model }
-      : { ...request, model: primary.model };
+    const resolvedModel = request.model ?? primary.model;
+    const primaryRequest = { ...request, model: resolvedModel };
+
+    // Check cache before calling LLM
+    if (this.cache !== undefined) {
+      const cached = this.cache.get(
+        request.prompt,
+        request.systemPrompt ?? '',
+        resolvedModel,
+      );
+      if (cached !== undefined) return cached;
+    }
 
     const provider = this.getProvider(primary.provider);
     if (provider === undefined) {
@@ -122,7 +134,9 @@ export class LLMRouter {
     }
 
     try {
-      return await provider.complete(primaryRequest);
+      const response = await provider.complete(primaryRequest);
+      this.cache?.set(request.prompt, request.systemPrompt ?? '', resolvedModel, response);
+      return response;
     } catch (primaryError) {
       // Fallback to secondary provider
       const fallbackProvider = this.getProvider(secondary.provider);
@@ -130,7 +144,9 @@ export class LLMRouter {
         throw primaryError;
       }
       const fallbackRequest = { ...request, model: secondary.model };
-      return await fallbackProvider.complete(fallbackRequest);
+      const response = await fallbackProvider.complete(fallbackRequest);
+      this.cache?.set(request.prompt, request.systemPrompt ?? '', secondary.model, response);
+      return response;
     }
   }
 
