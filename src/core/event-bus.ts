@@ -91,6 +91,40 @@ export interface AgentStatusChangedPayload {
   changedAt: Date;
 }
 
+export interface BudgetWarningPayload {
+  scope: 'global' | 'project';
+  projectId?: string;
+  spent: number;
+  limit: number;
+  ratio: number;
+  warnedAt: Date;
+}
+
+export interface BudgetExceededPayload {
+  scope: 'global' | 'project';
+  projectId?: string;
+  spent: number;
+  limit: number;
+  exceededAt: Date;
+}
+
+export interface HumanApprovalRequestedPayload {
+  projectId: string;
+  phase: Phase;
+  summary: string;
+  timeoutMs: number;
+  requestedAt: Date;
+}
+
+export interface HumanApprovalReceivedPayload {
+  projectId: string;
+  phase: Phase;
+  approved: boolean;
+  approvedBy?: string;
+  comment?: string;
+  respondedAt: Date;
+}
+
 // ---------------------------------------------------------------------------
 // Canonical event map — maps event name → single payload type
 // ---------------------------------------------------------------------------
@@ -107,6 +141,10 @@ export type AigoraEvents = {
   DeadlockDetected: DeadlockDetectedPayload;
   ErrorOccurred: ErrorOccurredPayload;
   AgentStatusChanged: AgentStatusChangedPayload;
+  BudgetWarning: BudgetWarningPayload;
+  BudgetExceeded: BudgetExceededPayload;
+  HumanApprovalRequested: HumanApprovalRequestedPayload;
+  HumanApprovalReceived: HumanApprovalReceivedPayload;
 };
 
 // ---------------------------------------------------------------------------

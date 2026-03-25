@@ -10,6 +10,8 @@ export interface GateContext {
 export interface GateCondition {
   name: string;
   check: (ctx: GateContext) => boolean;
+  /** When true, a HumanGateManager must obtain explicit approval before the gate passes. */
+  requiresHumanApproval?: boolean;
 }
 
 export interface PhaseConfig {
@@ -55,6 +57,7 @@ const DEFAULT_PHASE_CONFIGS: PhaseConfig[] = [
       {
         name: 'task-board-has-tasks',
         check: (ctx) => ctx.tasks.length >= 1,
+        requiresHumanApproval: true,
       },
     ],
     requiredRoles: [AgentRole.PM, AgentRole.ARCHITECT],
@@ -73,6 +76,7 @@ const DEFAULT_PHASE_CONFIGS: PhaseConfig[] = [
         name: 'design-artifact-exists',
         check: (ctx) =>
           (ctx.artifacts.get(Phase.DESIGN)?.length ?? 0) >= 1,
+        requiresHumanApproval: true,
       },
     ],
     requiredRoles: [AgentRole.DESIGNER, AgentRole.ARCHITECT],
@@ -164,6 +168,7 @@ const DEFAULT_PHASE_CONFIGS: PhaseConfig[] = [
             (phase) => (ctx.artifacts.get(phase)?.length ?? 0) >= 1,
           );
         },
+        requiresHumanApproval: true,
       },
     ],
     exitGate: [

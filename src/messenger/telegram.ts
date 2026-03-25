@@ -28,6 +28,7 @@ const ROLE_AVATAR: Record<string, string> = {
 
 export interface TelegramAdapterConfig {
   token: string;
+  botId?: string;
 }
 
 export class TelegramAdapter implements MessengerAdapter {
@@ -45,6 +46,10 @@ export class TelegramAdapter implements MessengerAdapter {
 
       const from = msg.from;
       const userId = from !== undefined ? String(from.id) : 'unknown';
+      const isBot = from?.is_bot === true;
+
+      // Skip own messages (self-message loop prevention)
+      if (config.botId !== undefined && userId === config.botId) return;
 
       // Telegram uses reply_to_message to form a thread. We treat the
       // message_id of the replied-to message as the threadId.
@@ -59,6 +64,7 @@ export class TelegramAdapter implements MessengerAdapter {
         userId,
         threadId,
         timestamp: new Date(msg.date * 1_000),
+        isBot,
       };
 
       for (const handler of this.handlers) {

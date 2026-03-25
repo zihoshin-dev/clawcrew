@@ -8,6 +8,8 @@ export interface IncomingMessage {
   userId: string;
   threadId?: string;
   timestamp: Date;
+  isBot?: boolean;
+  botId?: string;
 }
 
 export interface MessengerAdapter {

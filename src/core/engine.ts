@@ -11,6 +11,10 @@ import { createAdapter } from '../messenger/factory.js';
 import type { MessengerAdapter } from '../messenger/adapter.js';
 import { createLogger } from './logger.js';
 import type { Logger } from './logger.js';
+import { TeamSizer } from '../orchestrator/team-sizer.js';
+import type { AgentRole } from './types.js';
+import { CycleGuard } from '../orchestrator/cycle-guard.js';
+import phaseTeamsJson from '../../config/phase-teams.json' assert { type: 'json' };
 
 export type { AigoraConfig };
 
@@ -33,6 +37,8 @@ export class OrchestrationEngine {
   private readonly llmRouter: LLMRouter;
   private readonly messengers: MessengerAdapter[] = [];
   private readonly projectAgents: Map<string, BaseAgent[]> = new Map();
+  private readonly teamSizer: TeamSizer;
+  private readonly cycleGuards: Map<string, CycleGuard> = new Map();
 
   private readonly logger: Logger;
   private running = false;
@@ -44,6 +50,7 @@ export class OrchestrationEngine {
     this.registry = AgentRegistry.getInstance();
     this.llmRouter = new LLMRouter();
     this.logger = createLogger('aigora:engine', config.logLevel ?? 'info');
+    this.teamSizer = new TeamSizer(phaseTeamsJson as Record<string, { required: string[]; optional?: string[] }>);
   }
 
   // ---------------------------------------------------------------------------
@@ -160,6 +167,19 @@ export class OrchestrationEngine {
     if (project === undefined) return;
     const agents = this.projectAgents.get(projectId) ?? [];
 
+    // Initialise a CycleGuard per project if not already present
+    if (!this.cycleGuards.has(projectId)) {
+      this.cycleGuards.set(projectId, new CycleGuard());
+    }
+    const guard = this.cycleGuards.get(projectId)!;
+
+    const stopCheck = guard.shouldStop();
+    if (stopCheck.stop) {
+      this.logger.warn(`[CycleGuard] Stopping project ${projectId}: ${stopCheck.reason}`);
+      return;
+    }
+
+    const cycleOutputs: string[] = [];
     for (const agent of agents) {
       const thought = await agent.think({
         projectId,
@@ -169,23 +189,20 @@ export class OrchestrationEngine {
       });
       const result = await agent.act(thought);
       this.logger.debug(`[AgentCycle] ${agent.name} → ${result.action}: ${result.output.slice(0, 100)}`);
+      cycleOutputs.push(result.output);
     }
+
+    // Record the combined output of this cycle for oscillation detection
+    guard.recordCycle(cycleOutputs.join('\n'));
   }
 
   private spawnAgentsForProject(projectId: string): void {
-    const phaseTeams: Record<string, string[]> = {
-      RESEARCH: ['RESEARCHER', 'ANALYST'],
-      PLAN: ['PM', 'ARCHITECT'],
-      DESIGN: ['DESIGNER', 'ARCHITECT'],
-      CODE: ['DEVELOPER'],
-      TEST: ['QA'],
-      REVIEW: ['CRITIC', 'SECURITY'],
-      DEPLOY: ['DEVOPS'],
-    };
     const project = this.projects.get(projectId);
     if (project === undefined) return;
 
-    const roleNames = phaseTeams[project.phase] ?? ['RESEARCHER'];
+    const recommendation = this.teamSizer.recommend(project.agenda, project.phase);
+    this.logger.debug(`[TeamSizer] ${recommendation.reasoning}`);
+    const roleNames = recommendation.roles as AgentRole[];
     const agents: BaseAgent[] = [];
 
     for (const roleName of roleNames) {

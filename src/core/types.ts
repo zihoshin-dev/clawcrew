@@ -58,6 +58,7 @@ export interface MessengerConfig {
   signingSecret?: string;
   botToken?: string;
   appToken?: string;
+  allowedUserIds?: string[];
 }
 
 export interface AigoraConfig {

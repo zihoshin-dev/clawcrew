@@ -40,6 +40,7 @@ export interface SlackAdapterConfig {
   token: string;
   signingSecret: string;
   appToken?: string;
+  botId?: string;
 }
 
 export class SlackAdapter implements MessengerAdapter {
@@ -66,11 +67,21 @@ export class SlackAdapter implements MessengerAdapter {
         text?: string;
         channel?: string;
         user?: string;
+        bot_id?: string;
         thread_ts?: string;
         ts?: string;
       };
 
       if (raw.text === undefined || raw.user === undefined) return;
+
+      // Skip own messages (self-message loop prevention)
+      if (
+        config.botId !== undefined &&
+        raw.bot_id !== undefined &&
+        raw.bot_id === config.botId
+      ) {
+        return;
+      }
 
       const incoming: IncomingMessage = {
         text: raw.text,
@@ -78,6 +89,7 @@ export class SlackAdapter implements MessengerAdapter {
         userId: raw.user,
         threadId: raw.thread_ts,
         timestamp: new Date((parseFloat(raw.ts ?? '0')) * 1_000),
+        botId: raw.bot_id,
       };
 
       for (const handler of this.handlers) {
