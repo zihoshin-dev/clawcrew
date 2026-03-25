@@ -3,6 +3,7 @@ import type { LlmProvider } from './providers/base.js';
 import { AnthropicProvider } from './providers/anthropic.js';
 import { OpenAIProvider } from './providers/openai.js';
 import { GeminiProvider } from './providers/gemini.js';
+import { OllamaProvider } from './providers/ollama.js';
 import type { LlmCache } from './llm-cache.js';
 
 export type TaskComplexity = 'low' | 'medium' | 'high' | 'critical';
@@ -93,6 +94,9 @@ export class LLMRouter {
         break;
       case 'google':
         provider = new GeminiProvider();
+        break;
+      case 'ollama':
+        provider = new OllamaProvider();
         break;
       default:
         throw new Error(`Unknown provider: ${name}`);
