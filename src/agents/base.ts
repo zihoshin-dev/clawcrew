@@ -4,6 +4,7 @@ import type { Message } from '../core/types.js';
 import type { AgentPersona, ThinkContext, Thought, ActionResult } from './persona.js';
 import type { LLMRouter, LlmResponse, TaskComplexity } from '../core/llm-router.js';
 import type { ToolRegistry, ToolInput, ToolOutput } from '../tools/index.js';
+import type { DlpFilter } from '../security/dlp.js';
 
 export { AgentRole, AgentStatus };
 
@@ -26,6 +27,9 @@ export abstract class BaseAgent {
 
   /** Tool registry — optionally injected to enable tool use. */
   toolRegistry: ToolRegistry | undefined;
+
+  /** DLP filter — optionally injected to mask PII before LLM calls. */
+  private _dlpFilter: DlpFilter | undefined;
 
   constructor(role: AgentRole, persona: AgentPersona, name?: string) {
     this.id = nanoid();
@@ -50,6 +54,11 @@ export abstract class BaseAgent {
     this.toolRegistry = registry;
   }
 
+  /** Inject a DLP filter so LLM prompts are scrubbed of PII before sending. */
+  setDlpFilter(filter: DlpFilter): void {
+    this._dlpFilter = filter;
+  }
+
   /** Invoke a named tool from the registry. Throws if the tool is not found. */
   protected async useTool(name: string, input: ToolInput): Promise<ToolOutput> {
     if (this.toolRegistry === undefined) {
@@ -72,8 +81,11 @@ export abstract class BaseAgent {
     systemPromptOverride?: string,
   ): Promise<LlmResponse | undefined> {
     if (this._router === undefined) return undefined;
+    const filteredPrompt = this._dlpFilter !== undefined
+      ? this._dlpFilter.filter(userPrompt).filtered
+      : userPrompt;
     return this._router.route({
-      prompt: userPrompt,
+      prompt: filteredPrompt,
       systemPrompt: systemPromptOverride ?? this.persona.systemPrompt,
       agentRole: this.role,
       taskComplexity: complexity,

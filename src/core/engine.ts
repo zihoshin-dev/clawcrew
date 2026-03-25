@@ -16,6 +16,12 @@ import type { AgentRole } from './types.js';
 import { CycleGuard } from '../orchestrator/cycle-guard.js';
 import phaseTeamsJson from '../../config/phase-teams.json' assert { type: 'json' };
 import type { ProjectStore } from '../persistence/types.js';
+import { Pipeline } from '../orchestrator/pipeline.js';
+import { PhaseManager } from '../orchestrator/phase-manager.js';
+import { CostTracker } from './cost-tracker.js';
+import { createDefaultRegistry } from '../tools/index.js';
+import type { ToolRegistry } from '../tools/index.js';
+import { MessageAuthenticator } from '../messenger/auth.js';
 
 export type { AigoraConfig };
 
@@ -41,6 +47,10 @@ export class OrchestrationEngine {
   private readonly teamSizer: TeamSizer;
   private readonly cycleGuards: Map<string, CycleGuard> = new Map();
   private readonly projectStore: ProjectStore | undefined;
+  private readonly pipeline: Pipeline;
+  private readonly phaseManager: PhaseManager;
+  private readonly costTracker: CostTracker;
+  private readonly toolRegistry: ToolRegistry;
 
   private readonly logger: Logger;
   private running = false;
@@ -54,6 +64,10 @@ export class OrchestrationEngine {
     this.logger = createLogger('aigora:engine', config.logLevel ?? 'info');
     this.teamSizer = new TeamSizer(phaseTeamsJson as Record<string, { required: string[]; optional?: string[] }>);
     this.projectStore = projectStore;
+    this.pipeline = new Pipeline();
+    this.phaseManager = new PhaseManager(this.pipeline, this.bus);
+    this.costTracker = new CostTracker();
+    this.toolRegistry = createDefaultRegistry();
   }
 
   // ---------------------------------------------------------------------------
@@ -194,10 +208,42 @@ export class OrchestrationEngine {
       const result = await agent.act(thought);
       this.logger.debug(`[AgentCycle] ${agent.name} → ${result.action}: ${result.output.slice(0, 100)}`);
       cycleOutputs.push(result.output);
+
+      // Track cost if the agent's last LLM response is available via metadata
+      if (result.artifacts?.['llmResponse'] !== undefined) {
+        const llmResp = result.artifacts['llmResponse'] as import('./llm-router.js').LlmResponse;
+        this.costTracker.track(agent.id, llmResp, projectId);
+      }
     }
 
     // Record the combined output of this cycle for oscillation detection
     guard.recordCycle(cycleOutputs.join('\n'));
+
+    // Check if the pipeline can advance to the next phase
+    const gateCtx = {
+      artifacts: this.phaseManager.getAllArtifacts(),
+      tasks: project.tasks,
+    };
+    if (this.pipeline.canAdvance(gateCtx)) {
+      try {
+        const nextPhase = this.pipeline.advance(gateCtx);
+        await this.phaseManager.startPhase(nextPhase);
+        this.logger.info(`[Pipeline] Advanced to phase: ${nextPhase}`);
+      } catch {
+        // gate conditions may not be met — safe to ignore
+      }
+    }
+  }
+
+  /**
+   * Continuously run agent cycles for a project until the CycleGuard signals stop.
+   */
+  async runProjectLoop(projectId: string): Promise<void> {
+    const guard = this.cycleGuards.get(projectId) ?? new CycleGuard();
+    this.cycleGuards.set(projectId, guard);
+    while (!guard.shouldStop().stop) {
+      await this.runAgentCycle(projectId);
+    }
   }
 
   private spawnAgentsForProject(projectId: string): void {
@@ -214,6 +260,7 @@ export class OrchestrationEngine {
       try {
         const agent = AgentFactory.create(role as any);
         agent.setRouter(this.llmRouter);
+        agent.setTools(this.toolRegistry);
         this.registry.register({
           id: agent.id,
           name: agent.name,
@@ -240,7 +287,8 @@ export class OrchestrationEngine {
     this.bus.on('AgendaSubmitted', ({ projectId, agenda }) => {
       this.logger.info(`[AgendaSubmitted] project=${projectId} agenda="${agenda}"`);
       this.spawnAgentsForProject(projectId);
-      void this.runAgentCycle(projectId).catch((err) =>
+      this.phaseManager.setProjectId(projectId);
+      void this.runProjectLoop(projectId).catch((err) =>
         this.logger.error(`Agent cycle error: ${err instanceof Error ? err.message : String(err)}`),
       );
     });
@@ -280,8 +328,12 @@ export class OrchestrationEngine {
     for (const messengerConfig of this.config.messengers) {
       try {
         const adapter = createAdapter(messengerConfig);
-        adapter.onMessage((msg) => {
+        adapter.onMessage(async (msg) => {
           this.logger.debug(`[Messenger] Received: ${msg.text.slice(0, 80)}`);
+          const auth = new MessageAuthenticator({ rejectBots: true });
+          const result = auth.authenticate(msg);
+          if (!result.authenticated) return;
+          await this.submitAgenda(msg.text, msg.channel);
         });
         await adapter.connect();
         this.messengers.push(adapter);

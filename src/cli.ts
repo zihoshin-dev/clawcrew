@@ -5,6 +5,7 @@ import { loadConfig } from './core/config.js';
 import { OrchestrationEngine } from './core/engine.js';
 import { CostTracker } from './core/cost-tracker.js';
 import { CostReporter } from './dashboard/cost-reporter.js';
+import { SqliteProjectStore } from './persistence/sqlite-store.js';
 
 const program = new Command();
 
@@ -23,7 +24,8 @@ program
   .option('-c, --config <path>', 'Path to config file')
   .action(async (opts: { config?: string }) => {
     const config = loadConfig(opts.config);
-    const engine = new OrchestrationEngine(config);
+    const store = new SqliteProjectStore('./data/clawcrew.db');
+    const engine = new OrchestrationEngine(config, store);
 
     process.on('SIGINT', async () => {
       console.log('\nReceived SIGINT, shutting down...');
@@ -99,7 +101,8 @@ program
   .option('--channel <channel>', 'Target channel', 'default')
   .action(async (agenda: string, opts: { config?: string; channel: string }) => {
     const config = loadConfig(opts.config);
-    const engine = new OrchestrationEngine(config);
+    const store = new SqliteProjectStore('./data/clawcrew.db');
+    const engine = new OrchestrationEngine(config, store);
     await engine.start();
     const projectId = await engine.submitAgenda(agenda, opts.channel);
     console.log(`[clawcrew] Agenda submitted. Project ID: ${projectId}`);
