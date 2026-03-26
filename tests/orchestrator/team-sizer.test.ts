@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { createRequire } from 'module';
 import { TeamSizer } from '../../src/orchestrator/team-sizer.js';
 import { Phase } from '../../src/core/types.js';
-import phaseTeams from '../../config/phase-teams.json' assert { type: 'json' };
 
-const sizer = new TeamSizer(phaseTeams as Record<string, { required: string[]; optional?: string[] }>);
+const require = createRequire(import.meta.url);
+const phaseTeams = require('../../config/phase-teams.json') as Record<string, { required: string[]; optional?: string[] }>;
+
+const sizer = new TeamSizer(phaseTeams);
 
 describe('TeamSizer.classifyComplexity', () => {
   it('classifies very short agendas as trivial', () => {

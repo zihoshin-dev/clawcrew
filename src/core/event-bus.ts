@@ -109,14 +109,21 @@ export interface BudgetExceededPayload {
 }
 
 export interface HumanApprovalRequestedPayload {
+  requestId?: string;
+  runId?: string;
+  stepId?: string;
   projectId: string;
   phase: Phase;
   summary: string;
+  channel?: string;
   timeoutMs: number;
   requestedAt: Date;
 }
 
 export interface HumanApprovalReceivedPayload {
+  requestId?: string;
+  runId?: string;
+  stepId?: string;
   projectId: string;
   phase: Phase;
   approved: boolean;

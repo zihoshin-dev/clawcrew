@@ -148,6 +148,36 @@ describe('HumanGateManager', () => {
 
       await approvalPromise; // let it timeout
     });
+
+    it('matches by requestId when provided', async () => {
+      const bus = makeEventBus();
+      const gate = new HumanGateManager(bus, undefined);
+
+      const approvalPromise = gate.requestApproval({
+        requestId: 'approval-1',
+        runId: 'run-1',
+        stepId: 'step-1',
+        projectId: 'proj-E',
+        phase: Phase.REVIEW,
+        summary: 'Review approval',
+        timeoutMs: 5_000,
+      });
+
+      bus.emit('HumanApprovalReceived', {
+        requestId: 'approval-1',
+        runId: 'run-1',
+        stepId: 'step-1',
+        projectId: 'other-project',
+        phase: Phase.RESEARCH,
+        approved: true,
+        respondedAt: new Date(),
+      });
+
+      const result = await approvalPromise;
+      expect(result.approved).toBe(true);
+      expect(result.requestId).toBe('approval-1');
+      expect(result.runId).toBe('run-1');
+    });
   });
 
   describe('messenger integration', () => {
@@ -179,6 +209,30 @@ describe('HumanGateManager', () => {
       expect(channel).toBe('chan-1');
       expect(text).toContain('DESIGN');
       expect(text).toContain('approve');
+    });
+
+    it('uses explicit channel when provided', async () => {
+      const bus = makeEventBus();
+      const sendMessage = vi.fn().mockResolvedValue('msg-id');
+      const messenger = {
+        connect: vi.fn(),
+        disconnect: vi.fn(),
+        sendMessage,
+        createThread: vi.fn(),
+        onMessage: vi.fn(),
+        formatAgentMessage: vi.fn(),
+      };
+
+      const gate = new HumanGateManager(bus, messenger);
+      await gate.requestApproval({
+        projectId: 'project-only',
+        channel: 'channel-2',
+        phase: Phase.PLAN,
+        summary: 'Plan ready',
+        timeoutMs: 20,
+      });
+
+      expect(sendMessage).toHaveBeenCalledWith('channel-2', expect.any(String));
     });
   });
 });

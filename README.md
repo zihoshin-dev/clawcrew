@@ -1,152 +1,123 @@
 # ClawCrew
 
-> Where AI agents debate, decide, and deploy.
+> Steerable async workers from your pocket.
 
-**Messenger-based fully autonomous AI multi-agent software development ecosystem. OpenClaw-native.**
+ClawCrew is a **durable, review-first AI agent runtime** for software work. It runs locally first, persists execution state, pauses at approval boundaries, and can be steered from CLI, Slack, or Telegram.
 
-Throw an agenda into Slack or Telegram. Watch AI agents autonomously research, debate, plan, code, test, review, and deploy — then continuously improve.
+## What it is now
 
-## How It Works
+- **Durable runs and steps** persisted through a runtime store
+- **Review-first execution** with approval checkpoints and resumable runs
+- **CLI-first local workflow** for personal use
+- **Slack and Telegram steering** for async task ingestion and approval/resume loops
+- **Policy-aware tool execution** with action-batch previews and blast-radius summaries
+- **Persisted cost tracking** and status timelines
+- **Debate / consensus primitives** preserved as an advanced path instead of the default mode
 
-```
-You: "Build a REST API for user management with auth"
-     ↓ (Slack/Telegram)
-  [PM Agent]        → breaks into user stories
-  [Researcher]      → investigates best practices
-  [Architect]       → designs system architecture
-  [Developer x3]    → implements in parallel (Claude/GPT/Gemini)
-  [Critic]          → challenges every decision
-  [QA Agent]        → writes and runs tests
-  [Security Agent]  → audits for vulnerabilities
-  [DevOps Agent]    → deploys to production
-  [Retrospective]   → suggests improvements for next sprint
-     ↓
-  Working software + improvement backlog
-```
+## What it is not
 
-## Features
-
-- **14 Specialized Agent Roles** — Researcher, Architect, Developer, Critic, PM, QA, Security, Designer, Analyst, Mediator, DevOps, Scrum Master, Judge, Retrospective
-- **Multi-Messenger** — Slack (Bolt SDK) and Telegram (grammY) adapters, pluggable for Discord/Teams
-- **Multi-Model Routing** — Claude, GPT, Gemini with cost-aware complexity-based routing
-- **Debate Protocol** — Structured propose/argue/counter/vote with confidence scoring and deadlock-breaking judge
-- **7-Phase SDLC Pipeline** — Research → Plan → Design → Code → Test → Review → Deploy with gate conditions
-- **Persistent Memory** — Fact extraction, decision logging, project context that survives restarts
-- **Security Sandbox** — Policy engine + command interceptor blocks destructive operations
-- **Continuous Improvement** — Retrospective agent analyzes completed work and feeds improvements into next sprint
+- Not a “chatty office roleplay” product where lots of personas talking counts as progress
+- Not a distributed agent platform yet
+- Not a dashboard-first system that hides the real runtime under UI polish
 
 ## Quick Start
 
 ```bash
-# Clone
-git clone https://github.com/your-org/aigora.git
-cd aigora
-
-# Install
 npm install
-
-# Configure
 cp .env.example .env
-# Edit .env with your API keys and messenger tokens
 
-# Start
+# Start a local review-first run
+npx tsx src/cli.ts run "Design and review a small auth module" --mode review
+
+# Inspect persisted runs
+npx tsx src/cli.ts status
+
+# Approve a paused run
+npx tsx src/cli.ts approve <approval-id>
+
+# Inspect persisted runtime cost
+npx tsx src/cli.ts cost
+```
+
+You can also run a long-lived worker:
+
+```bash
 npm run dev
+```
 
-# Submit an agenda
-npx tsx src/cli.ts submit "Build a todo app with React and Express"
+## Runtime model
+
+ClawCrew now centers work around a durable runtime model:
+
+- **Project** — the top-level agenda and historical context
+- **Run** — one execution attempt for a project
+- **RunStep** — a persisted phase attempt within a run
+- **RunEvent** — append-only runtime timeline entries
+- **ApprovalRequest** — persisted approval checkpoint that can be resumed later
+
+This keeps progress visible and restart-safe instead of burying execution in transient in-memory loops.
+
+## Execution modes
+
+### `review` (default)
+- safest default for meaningful work
+- pauses at approval boundaries before risky steps
+- best fit for local use and messenger steering
+
+### `solo`
+- lighter-weight local execution with bounded autonomy
+
+### `full`
+- advanced mode that keeps debate/consensus available for more exploratory work
+
+## Messenger steering
+
+Slack and Telegram are treated as **transport and steering layers**:
+
+- create a run from an incoming message
+- receive compact status summaries
+- approve or reject a paused run
+
+They are no longer the source of runtime truth; the persisted runtime is.
+
+## Tools
+
+The default registry includes:
+
+- `file_read`
+- `directory_list`
+- `git_status`
+- `code_exec`
+- `web_search`
+
+Risky actions are surfaced as **action-batch previews** before approval-sensitive execution continues.
+
+## Development
+
+```bash
+npm run typecheck
+npm run build
+npm test
 ```
 
 ## Architecture
 
-```
+```text
 src/
-├── core/           # Engine, EventBus, Registry, Config, LLM Router
-│   └── providers/  # Anthropic, OpenAI, Gemini adapters
-├── agents/         # BaseAgent, Persona system
-│   └── roles/      # 14 specialized agent implementations
-├── messenger/      # Slack, Telegram adapters
-├── orchestrator/   # Pipeline, Debate, Consensus, TaskBoard, Sprints
-├── memory/         # MemoryStore, FactExtractor, DecisionLog
-└── sandbox/        # PolicyEngine, CommandInterceptor, SandboxExecutor
-```
-
-### Key Design Decisions
-
-| Decision | Choice | Rationale |
-|----------|--------|-----------|
-| Language | TypeScript | Type safety for complex agent interactions |
-| Event System | EventEmitter3 | Lightweight pub/sub, no external broker needed |
-| Database | SQLite/JSON | Zero-config, embedded, portable |
-| Messenger SDK | Bolt + grammY | Official SDKs, Socket Mode support |
-| LLM Routing | Complexity-based | Cost optimization: haiku for simple, opus for critical |
-
-## Agent Roles
-
-| Role | Personality | Decision Style |
-|------|------------|----------------|
-| PM | Balanced, pragmatic | Data-driven consensus |
-| Researcher | Curious, thorough | Evidence-based |
-| Architect | Principled, forward-thinking | Pattern-based |
-| Developer | Creative, practical | Iterative |
-| Critic | Rigorous, assertive | Devil's advocate |
-| QA | Methodical, skeptical | Risk-based |
-| Security | Paranoid, thorough | Threat-model driven |
-| Designer | Empathetic, creative | User-centered |
-| Analyst | Analytical, objective | Metric-driven |
-| Mediator | Diplomatic, patient | Consensus-building |
-| DevOps | Efficiency-focused | Automation-first |
-| Scrum Master | Facilitative, protective | Process-oriented |
-| Judge | Impartial, logical | Weighted evidence |
-| Retrospective | Reflective, improvement-focused | Pattern recognition |
-
-## Debate Protocol
-
-```
-Round 1: PROPOSE  — Each agent states position + confidence (0-1)
-Round 2: ARGUE    — Agents defend with evidence
-Round 3: COUNTER  — Challenge other positions
-Round 4: VOTE     — Final positions with updated confidence
-         ↓
-Consensus? (>70% agree, confidence >0.6) → Decision made
-Deadlock?  (3+ rounds, no convergence)   → Judge intervenes
-```
-
-## Configuration
-
-```yaml
-# config/default.yaml
-messenger:
-  type: slack  # or telegram
-  slack:
-    socketMode: true
-
-llm:
-  defaultProvider: anthropic
-  routing:
-    low: claude-haiku-4-5
-    medium: claude-sonnet-4-5
-    high: claude-opus-4
-    critical: multi-model-consensus
-
-sandbox:
-  enabled: true
-  timeout: 30000
-  maxMemory: 512mb
+├── core/         # engine, runtime helpers, event bus, config, LLM router
+├── agents/       # base agent, personas, role implementations
+├── persistence/  # runtime/project store and SQLite + fallback backend
+├── messenger/    # Slack, Telegram, KakaoWork adapters
+├── orchestrator/ # legacy debate/pipeline/human-gate primitives
+├── tools/        # builtin tools and registry
+├── sandbox/      # policy engine, command interception, sandbox execution
+└── dashboard/    # cost/status formatting
 ```
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
 MIT
-
-## Acknowledgments
-
-Built on research from:
-- [ChatDev](https://github.com/OpenBMB/ChatDev) — Communicative Agents for Software Development
-- [MDAgents](https://arxiv.org/abs/2311.10537) — Adaptive Collaboration of LLMs
-- [PersonaHub](https://arxiv.org/abs/2406.04093) — 1B Personas for Scalable Studies
-- [oh-my-claudecode](https://github.com/anthropics/claude-code) — Multi-model orchestration
-- [Supermemory](https://github.com/supermemoryai/supermemory) — AI Memory Engine

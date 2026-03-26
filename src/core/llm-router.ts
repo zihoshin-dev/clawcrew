@@ -1,4 +1,4 @@
-import type { AgentRole } from './types.js';
+import type { AgentRole, LlmConfig } from './types.js';
 import type { LlmProvider } from './providers/base.js';
 import { AnthropicProvider } from './providers/anthropic.js';
 import { OpenAIProvider } from './providers/openai.js';
@@ -45,6 +45,13 @@ type RoutingConfig = {
   critical: CriticalConfig;
 };
 
+export interface LLMRouterOptions {
+  routing?: RoutingConfig;
+  cache?: LlmCache;
+  defaultConfig?: Partial<LlmConfig>;
+  agentOverrides?: Partial<Record<AgentRole, Partial<LlmConfig>>>;
+}
+
 const DEFAULT_ROUTING: RoutingConfig = {
   low: {
     primary: { provider: 'anthropic', model: 'claude-haiku-4-5' },
@@ -75,25 +82,30 @@ export class LLMRouter {
   private readonly providerCache = new Map<string, LlmProvider>();
   private readonly routing: RoutingConfig;
   private readonly cache: LlmCache | undefined;
+  private readonly defaultConfig: Partial<LlmConfig> | undefined;
+  private readonly agentOverrides: Partial<Record<AgentRole, Partial<LlmConfig>>>;
 
-  constructor(routing?: RoutingConfig, cache?: LlmCache) {
-    this.routing = routing ?? DEFAULT_ROUTING;
-    this.cache = cache;
+  constructor(options?: LLMRouterOptions) {
+    this.routing = options?.routing ?? DEFAULT_ROUTING;
+    this.cache = options?.cache;
+    this.defaultConfig = options?.defaultConfig;
+    this.agentOverrides = options?.agentOverrides ?? {};
   }
 
-  private getProvider(name: string): LlmProvider {
-    let provider = this.providerCache.get(name);
+  private getProvider(name: string, apiKey?: string): LlmProvider {
+    const cacheKey = `${name}:${apiKey ?? ''}`;
+    let provider = this.providerCache.get(cacheKey);
     if (provider !== undefined) return provider;
 
     switch (name) {
       case 'anthropic':
-        provider = new AnthropicProvider();
+        provider = new AnthropicProvider(apiKey);
         break;
       case 'openai':
-        provider = new OpenAIProvider();
+        provider = new OpenAIProvider(apiKey);
         break;
       case 'google':
-        provider = new GeminiProvider();
+        provider = new GeminiProvider(apiKey);
         break;
       case 'ollama':
         provider = new OllamaProvider();
@@ -101,12 +113,25 @@ export class LLMRouter {
       default:
         throw new Error(`Unknown provider: ${name}`);
     }
-    this.providerCache.set(name, provider);
+    this.providerCache.set(cacheKey, provider);
     return provider;
   }
 
   get providers(): Map<string, LlmProvider> {
     return this.providerCache;
+  }
+
+  hasConfiguredProvider(agentRole?: AgentRole): boolean {
+    const effectiveConfig = this.resolveEffectiveConfig(agentRole);
+    if (effectiveConfig.apiKey !== undefined && effectiveConfig.apiKey.length > 0) {
+      return true;
+    }
+
+    if (effectiveConfig.provider !== undefined) {
+      return envApiKeyForProvider(effectiveConfig.provider) !== undefined;
+    }
+
+    return ['anthropic', 'openai', 'google', 'ollama'].some((provider) => envApiKeyForProvider(provider) !== undefined);
   }
 
   async route(request: LlmRequest): Promise<LlmResponse> {
@@ -115,7 +140,8 @@ export class LLMRouter {
     }
 
     const config = this.routing[request.taskComplexity] as ComplexityConfig;
-    const primary = config.primary;
+    const effectiveConfig = this.resolveEffectiveConfig(request.agentRole);
+    const primary = resolvePrimaryProvider(config.primary, effectiveConfig, request.model);
     const secondary = config.secondary;
 
     // Use explicit model override if provided
@@ -132,7 +158,7 @@ export class LLMRouter {
       if (cached !== undefined) return cached;
     }
 
-    const provider = this.getProvider(primary.provider);
+    const provider = this.getProvider(primary.provider, effectiveConfig?.apiKey);
     if (provider === undefined) {
       throw new Error(`Provider not found: ${primary.provider}`);
     }
@@ -191,4 +217,57 @@ export class LLMRouter {
       cost: totalCost,
     };
   }
+
+  private resolveEffectiveConfig(agentRole?: AgentRole): Partial<LlmConfig> {
+    return {
+      ...(this.defaultConfig ?? {}),
+      ...(agentRole !== undefined ? this.agentOverrides[agentRole] ?? {} : {}),
+    };
+  }
+}
+
+function resolvePrimaryProvider(
+  primary: ProviderModelPair,
+  effectiveConfig?: Partial<LlmConfig>,
+  explicitModel?: string,
+): ProviderModelPair {
+  if (effectiveConfig?.provider !== undefined || effectiveConfig?.model !== undefined) {
+    return {
+      provider: effectiveConfig.provider ?? primary.provider,
+      model: explicitModel ?? effectiveConfig.model ?? primary.model,
+    };
+  }
+
+  const provider = process.env['LLM_PROVIDER'];
+  const model = process.env['LLM_MODEL'];
+  if (provider === undefined) {
+    return primary;
+  }
+
+  return {
+    provider,
+    model: model ?? primary.model,
+  };
+}
+
+function envApiKeyForProvider(provider: string): string | undefined {
+  switch (provider) {
+    case 'anthropic':
+      return normalizeEnv(process.env['ANTHROPIC_API_KEY']);
+    case 'openai':
+      return normalizeEnv(process.env['OPENAI_API_KEY']);
+    case 'google':
+      return normalizeEnv(process.env['GOOGLE_API_KEY']);
+    case 'ollama':
+      return 'ollama';
+    default:
+      return undefined;
+  }
+}
+
+function normalizeEnv(value: string | undefined): string | undefined {
+  if (value === undefined || value.length === 0 || value === 'undefined') {
+    return undefined;
+  }
+  return value;
 }

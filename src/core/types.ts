@@ -44,6 +44,47 @@ export enum Phase {
   DEPLOY = 'DEPLOY',
 }
 
+export enum RunMode {
+  SOLO = 'solo',
+  REVIEW = 'review',
+  FULL = 'full',
+}
+
+export enum RunSource {
+  CLI = 'cli',
+  SLACK = 'slack',
+  TELEGRAM = 'telegram',
+  WEBHOOK = 'webhook',
+  INTERNAL = 'internal',
+}
+
+export enum RunStatus {
+  QUEUED = 'queued',
+  RUNNING = 'running',
+  WAITING_APPROVAL = 'waiting_approval',
+  PAUSED = 'paused',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  CANCELLED = 'cancelled',
+}
+
+export enum RunStepStatus {
+  PENDING = 'pending',
+  QUEUED = 'queued',
+  RUNNING = 'running',
+  WAITING_APPROVAL = 'waiting_approval',
+  COMPLETED = 'completed',
+  FAILED = 'failed',
+  SKIPPED = 'skipped',
+  CANCELLED = 'cancelled',
+}
+
+export type AutonomyLevel = 'read_only' | 'review' | 'bounded' | 'full';
+export type ActionEnvelopeType = 'message' | 'artifact' | 'tool_call' | 'approval_request' | 'decision' | 'finish';
+export type ActionRisk = 'low' | 'medium' | 'high';
+export type ApprovalStatus = 'pending' | 'approved' | 'rejected' | 'timed_out' | 'cancelled';
+export type PermissionDecision = 'allow' | 'warn' | 'require_approval' | 'deny';
+
 export interface LlmConfig {
   provider: 'anthropic' | 'openai' | 'google';
   model: string;
@@ -109,4 +150,136 @@ export interface Project {
   updatedAt: Date;
   completedAt?: Date;
   metadata?: Record<string, unknown>;
+}
+
+export interface RunBudget {
+  maxCostUsd?: number;
+  maxModelCalls?: number;
+  maxWriteActions?: number;
+}
+
+export interface AgentActionEnvelope {
+  type: ActionEnvelopeType;
+  title: string;
+  summary: string;
+  risk: ActionRisk;
+  requiresApproval?: boolean;
+  permissions?: string[];
+  toolName?: string;
+  toolInput?: Record<string, unknown>;
+  filePaths?: string[];
+  payload?: Record<string, unknown>;
+}
+
+export interface ActionBatchPreview {
+  runId: string;
+  stepId: string;
+  summary: string;
+  actions: AgentActionEnvelope[];
+  approvalRequired: boolean;
+  blastRadius: {
+    permissions: string[];
+    filePaths: string[];
+    externalEffects: string[];
+  };
+}
+
+export interface Run {
+  id: string;
+  projectId: string;
+  agenda: string;
+  channel: string;
+  threadId?: string;
+  source: RunSource;
+  mode: RunMode;
+  autonomy: AutonomyLevel;
+  status: RunStatus;
+  currentStepId?: string;
+  requestedBy?: string;
+  error?: string;
+  budget?: RunBudget;
+  createdAt: Date;
+  updatedAt: Date;
+  completedAt?: Date;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RunStep {
+  id: string;
+  runId: string;
+  key: string;
+  title: string;
+  phase: Phase;
+  status: RunStepStatus;
+  sequence: number;
+  assignedRoles: AgentRole[];
+  actionBatch?: ActionBatchPreview;
+  checkpoint?: Record<string, unknown>;
+  resultSummary?: string;
+  retryCount: number;
+  startedAt?: Date;
+  completedAt?: Date;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RunEvent {
+  id: string;
+  runId: string;
+  stepId?: string;
+  type: string;
+  message: string;
+  payload?: Record<string, unknown>;
+  createdAt: Date;
+}
+
+export interface ApprovalRequestRecord {
+  id: string;
+  runId: string;
+  stepId: string;
+  projectId: string;
+  phase: Phase;
+  channel: string;
+  status: ApprovalStatus;
+  summary: string;
+  timeoutMs: number;
+  actionBatch?: ActionBatchPreview;
+  requestedAt: Date;
+  respondedAt?: Date;
+  approvedBy?: string;
+  comment?: string;
+}
+
+export interface RuntimeArtifact {
+  id: string;
+  runId: string;
+  stepId?: string;
+  projectId: string;
+  name: string;
+  type: string;
+  content: unknown;
+  createdAt: Date;
+}
+
+export interface PermissionDecisionResult {
+  decision: PermissionDecision;
+  reason?: string;
+}
+
+export interface SubmitRunOptions {
+  mode?: RunMode;
+  autonomy?: AutonomyLevel;
+  source?: RunSource;
+  requestedBy?: string;
+  threadId?: string;
+  budget?: RunBudget;
+  metadata?: Record<string, unknown>;
+}
+
+export interface RunStatusSummary {
+  run: Run;
+  currentStep?: RunStep;
+  pendingApproval?: ApprovalRequestRecord;
+  recentEvents: RunEvent[];
+  totalCostUsd: number;
+  actionPreview?: ActionBatchPreview;
 }

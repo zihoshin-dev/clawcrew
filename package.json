@@ -1,7 +1,7 @@
 {
   "name": "clawcrew",
   "version": "0.1.0",
-  "description": "Messenger-based fully autonomous AI multi-agent software development ecosystem — where AI agents debate, decide, and deploy.",
+  "description": "Durable, review-first AI agent runtime with CLI-first workflows and messenger steering.",
   "type": "module",
   "main": "dist/cli.js",
   "bin": {

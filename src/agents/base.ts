@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid';
 import { AgentRole, AgentStatus } from '../core/types.js';
+import type { AgentActionEnvelope } from '../core/types.js';
 import type { Message } from '../core/types.js';
 import type { AgentPersona, ThinkContext, Thought, ActionResult } from './persona.js';
 import type { LLMRouter, LlmResponse, TaskComplexity } from '../core/llm-router.js';
@@ -81,6 +82,7 @@ export abstract class BaseAgent {
     systemPromptOverride?: string,
   ): Promise<LlmResponse | undefined> {
     if (this._router === undefined) return undefined;
+    if (!this._router.hasConfiguredProvider(this.role)) return undefined;
     const filteredPrompt = this._dlpFilter !== undefined
       ? this._dlpFilter.filter(userPrompt).filtered
       : userPrompt;
@@ -171,13 +173,19 @@ export abstract class BaseAgent {
   }
 
   /** Convenience: build a successful ActionResult. */
-  protected buildResult(action: string, output: string, artifacts?: Record<string, unknown>): ActionResult {
+  protected buildResult(
+    action: string,
+    output: string,
+    artifacts?: Record<string, unknown>,
+    envelopes?: AgentActionEnvelope[],
+  ): ActionResult {
     return {
       agentId: this.id,
       action,
       success: true,
       output,
       artifacts,
+      envelopes,
     };
   }
 }

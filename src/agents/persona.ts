@@ -1,4 +1,4 @@
-import type { AgentRole, Phase } from '../core/types.js';
+import type { AgentActionEnvelope, AgentRole, Phase } from '../core/types.js';
 
 // ---------------------------------------------------------------------------
 // Personality & Persona
@@ -54,6 +54,7 @@ export interface ActionResult {
   success: boolean;
   output: string;
   artifacts?: Record<string, unknown>;
+  envelopes?: AgentActionEnvelope[];
   durationMs?: number;
 }
 

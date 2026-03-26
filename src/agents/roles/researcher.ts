@@ -28,11 +28,33 @@ export class ResearcherAgent extends BaseAgent {
   async act(thought: Thought): Promise<ActionResult> {
     const prompt = `Based on this research analysis, produce a structured research report:\n\n${thought.reasoning}`;
     const llmResponse = await this.callLLM(prompt, 'medium');
+    const output = llmResponse?.content ?? `Research report for "${thought.summary}".`;
 
     return this.buildResult(
       thought.suggestedAction,
-      llmResponse?.content ?? `Research report for "${thought.summary}".`,
-      { sources: [], gaps: [], usedLLM: !!llmResponse },
+      output,
+      { sources: [], gaps: [], usedLLM: !!llmResponse, llmResponse },
+      [
+        {
+          type: 'artifact',
+          title: 'Research report',
+          summary: 'Produce a research artifact for the current phase.',
+          risk: 'low',
+          payload: {
+            artifactType: 'research-report',
+            content: output,
+          },
+        },
+        {
+          type: 'tool_call',
+          title: 'Inspect workspace layout',
+          summary: 'Collect a lightweight directory listing for runtime grounding.',
+          risk: 'low',
+          permissions: ['fs:read'],
+          toolName: 'directory_list',
+          toolInput: { path: process.cwd() },
+        },
+      ],
     );
   }
 
