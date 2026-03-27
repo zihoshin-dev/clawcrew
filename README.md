@@ -25,24 +25,36 @@ ClawCrew is a **durable, review-first AI agent runtime** for software work. It r
 ```bash
 npm install
 cp .env.example .env
+npm run build
 
-# Start a local review-first run
-npx tsx src/cli.ts run "Design and review a small auth module" --mode review
+# Start a local review-first run from a source checkout
+node dist/cli.js run "Design and review a small auth module" --mode review
 
 # Inspect persisted runs
-npx tsx src/cli.ts status
+node dist/cli.js status
 
 # Approve a paused run
-npx tsx src/cli.ts approve <approval-id>
+node dist/cli.js approve <approval-id>
 
 # Inspect persisted runtime cost
-npx tsx src/cli.ts cost
+node dist/cli.js cost
+
+# Accept a GitHub webhook payload through the same runtime
+node dist/cli.js webhook github --event pull_request --payload examples/github/pull_request.opened.json
 ```
 
-You can also run a long-lived worker:
+If you installed ClawCrew as a package, use the shipped binary instead:
 
 ```bash
-npm run dev
+clawcrew run "Design and review a small auth module" --mode review
+clawcrew approve <approval-id>
+clawcrew webhook github --event pull_request --payload examples/github/pull_request.opened.json
+```
+
+You can also run a long-lived worker from a source checkout:
+
+```bash
+npm start
 ```
 
 ## Runtime model
@@ -80,6 +92,24 @@ Slack and Telegram are treated as **transport and steering layers**:
 
 They are no longer the source of runtime truth; the persisted runtime is.
 
+## Webhook ingress
+
+ClawCrew can also ingest GitHub webhook payloads through the same shared runtime path used by CLI and chat ingress.
+
+Supported examples now include:
+
+- `pull_request`
+- `issues`
+- `issue_comment`
+
+Example:
+
+```bash
+clawcrew webhook github --event pull_request --payload examples/github/pull_request.opened.json
+```
+
+This creates a persisted `Run` with `source=webhook`, then uses the normal status / approval / cost model.
+
 ## Tools
 
 The default registry includes:
@@ -99,6 +129,8 @@ npm run typecheck
 npm run build
 npm test
 ```
+
+Runnable examples live under [`examples/`](examples/README.md).
 
 ## Architecture
 

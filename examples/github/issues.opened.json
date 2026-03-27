@@ -1,0 +1,13 @@
+{
+  "action": "opened",
+  "repository": {
+    "full_name": "acme/clawcrew"
+  },
+  "sender": {
+    "login": "triager"
+  },
+  "issue": {
+    "title": "Webhook-driven issue triage",
+    "number": 11
+  }
+}

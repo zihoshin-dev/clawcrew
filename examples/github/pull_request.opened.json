@@ -1,0 +1,13 @@
+{
+  "action": "opened",
+  "repository": {
+    "full_name": "acme/clawcrew"
+  },
+  "sender": {
+    "login": "ziho"
+  },
+  "pull_request": {
+    "title": "Add durable runtime webhook trigger",
+    "number": 42
+  }
+}

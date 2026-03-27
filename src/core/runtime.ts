@@ -162,6 +162,8 @@ export function formatRunSummary(summary: RunStatusSummary): string {
     `Run ${summary.run.id}`,
     `Status: ${summary.run.status}`,
     `Mode: ${summary.run.mode}`,
+    `Source: ${summary.run.source}`,
+    `Channel: ${summary.run.channel}`,
     `Agenda: ${summary.run.agenda}`,
   ];
 

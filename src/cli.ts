@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 import 'dotenv/config';
+import { existsSync, readFileSync } from 'fs';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 import { Command } from 'commander';
 import { loadConfig } from './core/config.js';
 import { OrchestrationEngine } from './core/engine.js';
@@ -7,9 +10,11 @@ import { RunMode, RunStatus } from './core/types.js';
 import { SqliteProjectStore } from './persistence/sqlite-store.js';
 import { CostReporter } from './dashboard/cost-reporter.js';
 import { formatRunSummary } from './core/runtime.js';
+import { createGitHubWebhookRunRequest } from './integrations/github-webhook.js';
 
 const program = new Command();
 const DEFAULT_DB_PATH = `${process.env['DATA_DIR'] ?? './data'}/clawcrew.db`;
+const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
 program
   .name('clawcrew')
@@ -197,6 +202,54 @@ program
     store.close();
   });
 
+program
+  .command('webhook <provider>')
+  .description('Create a run from a supported webhook payload')
+  .option('-c, --config <path>', 'Path to config file')
+  .option('--event <event>', 'Webhook event name')
+  .option('--payload <path>', 'Path to a JSON payload file')
+  .option('--mode <mode>', 'Execution mode: solo|review|full', RunMode.REVIEW)
+  .action(async (provider: string, opts: { config?: string; event?: string; payload?: string; mode: RunMode }) => {
+    if (provider !== 'github') {
+      console.error(`[clawcrew] Unsupported webhook provider: ${provider}`);
+      process.exitCode = 1;
+      return;
+    }
+    if (opts.event === undefined || opts.payload === undefined) {
+      console.error('[clawcrew] --event and --payload are required for webhook ingestion.');
+      process.exitCode = 1;
+      return;
+    }
+
+    let payload: Record<string, unknown>;
+    try {
+      payload = JSON.parse(readFileSync(resolvePayloadPath(opts.payload), 'utf-8')) as Record<string, unknown>;
+    } catch (error) {
+      console.error(`[clawcrew] Invalid webhook payload: ${error instanceof Error ? error.message : String(error)}`);
+      process.exitCode = 1;
+      return;
+    }
+
+    const request = createGitHubWebhookRunRequest({
+      event: opts.event,
+      payload,
+      mode: parseMode(opts.mode),
+    });
+
+    const config = loadConfig(opts.config);
+    const store = new SqliteProjectStore(DEFAULT_DB_PATH);
+    const engine = new OrchestrationEngine(config, store);
+    await engine.start();
+
+    try {
+      const run = await engine.submitRun(request.agenda, request.channel, request.options);
+      console.log(`[clawcrew] Accepted ${provider} webhook event ${opts.event} into run ${run.id}`);
+      await waitForRun(engine, run.id);
+    } finally {
+      await engine.stop();
+    }
+  });
+
 program.parse(process.argv);
 
 async function waitForRun(engine: OrchestrationEngine, runId: string): Promise<void> {
@@ -246,4 +299,18 @@ function parseMode(mode: string): RunMode {
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function resolvePayloadPath(payloadPath: string): string {
+  const candidate = resolve(process.cwd(), payloadPath);
+  if (existsSync(candidate)) {
+    return candidate;
+  }
+
+  const packaged = resolve(PACKAGE_ROOT, payloadPath);
+  if (existsSync(packaged)) {
+    return packaged;
+  }
+
+  return candidate;
 }

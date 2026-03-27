@@ -1,12 +1,13 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
-import { mkdtempSync, rmSync } from 'fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { tmpdir } from 'os';
 
 const execFileAsync = promisify(execFile);
 const CLI_CWD = '/Users/ziho/Desktop/ziho_dev/clawcrew';
+const CLI_ENTRY = join(CLI_CWD, 'src/cli.ts');
 
 const tempDirs: string[] = [];
 
@@ -34,6 +35,45 @@ describe('clawcrew CLI', () => {
     const approveResult = await runCli(['approve', approvalId!], dataDir);
     expect(approveResult.stdout).toContain('Status: completed');
   });
+
+  it('accepts a github webhook payload through the shared runtime intake', async () => {
+    const dataDir = makeTempDataDir();
+    const payloadPath = join(dataDir, 'pull_request.opened.json');
+    writeFileSync(payloadPath, JSON.stringify({
+      action: 'opened',
+      repository: { full_name: 'acme/clawcrew' },
+      sender: { login: 'ziho' },
+      pull_request: { title: 'Add runtime webhook trigger', number: 9 },
+    }), 'utf-8');
+
+    const result = await runCli(['webhook', 'github', '--event', 'pull_request', '--payload', payloadPath], dataDir);
+    expect(result.stdout).toContain('Accepted github webhook event pull_request');
+    expect(result.stdout).toContain('Status: waiting_approval');
+    expect(result.stdout).toContain('github:acme/clawcrew');
+  });
+
+  it('resolves bundled example payloads outside the package root', async () => {
+    const dataDir = makeTempDataDir();
+    const outsideCwd = makeTempDataDir();
+    const result = await runCli(
+      ['webhook', 'github', '--event', 'pull_request', '--payload', 'examples/github/pull_request.opened.json'],
+      dataDir,
+      outsideCwd,
+    );
+
+    expect(result.stdout).toContain('Accepted github webhook event pull_request');
+    expect(result.stdout).toContain('github:acme/clawcrew');
+  });
+
+  it('fails cleanly for an invalid webhook payload file', async () => {
+    const dataDir = makeTempDataDir();
+    const payloadPath = join(dataDir, 'broken.json');
+    writeFileSync(payloadPath, '{not-json', 'utf-8');
+
+    await expect(runCli(['webhook', 'github', '--event', 'pull_request', '--payload', payloadPath], dataDir)).rejects.toMatchObject({
+      stderr: expect.stringContaining('Invalid webhook payload'),
+    });
+  });
 });
 
 function makeTempDataDir(): string {
@@ -42,9 +82,9 @@ function makeTempDataDir(): string {
   return dir;
 }
 
-async function runCli(args: string[], dataDir: string): Promise<{ stdout: string; stderr: string }> {
-  return execFileAsync('npx', ['tsx', 'src/cli.ts', ...args], {
-    cwd: CLI_CWD,
+async function runCli(args: string[], dataDir: string, cwd = CLI_CWD): Promise<{ stdout: string; stderr: string }> {
+  return execFileAsync('npx', ['tsx', CLI_ENTRY, ...args], {
+    cwd,
     env: { ...process.env, DATA_DIR: dataDir },
   });
 }

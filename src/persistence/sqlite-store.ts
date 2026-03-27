@@ -158,16 +158,23 @@ function hydrateFallbackState(filePath: string): FallbackStoreState {
   const raw = existsSync(filePath)
     ? (JSON.parse(readFileSync(filePath, 'utf-8')) as JsonFallbackState)
     : EMPTY_FALLBACK_STATE;
+  const projects = raw.projects ?? [];
+  const runs = raw.runs ?? [];
+  const steps = raw.steps ?? [];
+  const events = raw.events ?? [];
+  const artifacts = raw.artifacts ?? [];
+  const approvals = raw.approvals ?? [];
+  const costs = raw.costs ?? [];
 
   return {
     path: filePath,
-    projects: new Map(raw.projects.map((project) => [project.id, hydrateProject(project)])),
-    runs: new Map(raw.runs.map((run) => [run.id, hydrateRun(run)])),
-    steps: new Map(raw.steps.map((step) => [step.id, hydrateRunStep(step)])),
-    events: raw.events.map(hydrateRunEvent),
-    artifacts: raw.artifacts.map(hydrateRuntimeArtifact),
-    approvals: new Map(raw.approvals.map((record) => [record.id, hydrateApproval(record)])),
-    costs: raw.costs.map(hydrateCostEntry),
+    projects: new Map(projects.map((project) => [project.id, hydrateProject(project)])),
+    runs: new Map(runs.map((run) => [run.id, hydrateRun(run)])),
+    steps: new Map(steps.map((step) => [step.id, hydrateRunStep(step)])),
+    events: events.map(hydrateRunEvent),
+    artifacts: artifacts.map(hydrateRuntimeArtifact),
+    approvals: new Map(approvals.map((record) => [record.id, hydrateApproval(record)])),
+    costs: costs.map(hydrateCostEntry),
   };
 }
 
