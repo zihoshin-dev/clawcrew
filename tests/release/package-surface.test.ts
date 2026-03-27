@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
-const ROOT = '/Users/ziho/Desktop/ziho_dev/clawcrew';
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 describe('package release surface', () => {
   it('ships config and examples in the package files list', () => {

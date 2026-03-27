@@ -1,10 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 import { webSearchTool } from '../../src/tools/builtin/web-search.js';
 import { codeExecTool } from '../../src/tools/builtin/code-exec.js';
 import { fileReadTool } from '../../src/tools/builtin/file-read.js';
 import { directoryListTool } from '../../src/tools/builtin/directory-list.js';
 import { gitStatusTool } from '../../src/tools/builtin/git-status.js';
 import { createDefaultRegistry } from '../../src/tools/index.js';
+
+const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 describe('webSearchTool', () => {
   const originalFetch = global.fetch;
@@ -65,7 +69,7 @@ describe('fileReadTool', () => {
   });
 
   it('reads an existing file and returns its content', async () => {
-    const output = await fileReadTool.execute({ path: '/Users/ziho/Desktop/ziho_dev/clawcrew/package.json' });
+    const output = await fileReadTool.execute({ path: resolve(ROOT, 'package.json') });
     expect(output.success).toBe(true);
     expect(typeof output.result).toBe('string');
     expect(output.result as string).toContain('clawcrew');
@@ -80,7 +84,7 @@ describe('fileReadTool', () => {
 
 describe('directoryListTool', () => {
   it('lists files in the target directory', async () => {
-    const output = await directoryListTool.execute({ path: '/Users/ziho/Desktop/ziho_dev/clawcrew/src/tools' });
+    const output = await directoryListTool.execute({ path: resolve(ROOT, 'src/tools') });
     expect(output.success).toBe(true);
     expect(Array.isArray(output.result)).toBe(true);
     expect((output.result as Array<{ name: string }>).some((entry) => entry.name === 'index.ts')).toBe(true);
@@ -89,7 +93,7 @@ describe('directoryListTool', () => {
 
 describe('gitStatusTool', () => {
   it('returns git status output for the repo', async () => {
-    const output = await gitStatusTool.execute({ cwd: '/Users/ziho/Desktop/ziho_dev/clawcrew' });
+    const output = await gitStatusTool.execute({ cwd: ROOT });
     expect(output.success).toBe(true);
     expect(typeof output.result).toBe('string');
   });

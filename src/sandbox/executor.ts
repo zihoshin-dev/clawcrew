@@ -71,13 +71,25 @@ export class SandboxExecutor {
         cwd,
         env: env as NodeJS.ProcessEnv,
         stdio: ['ignore', 'pipe', 'pipe'],
+        detached: process.platform !== 'win32',
       });
+
+      const terminate = () => {
+        if (process.platform !== 'win32' && child.pid !== undefined) {
+          try {
+            process.kill(-child.pid, 'SIGKILL');
+            return;
+          } catch {
+          }
+        }
+        child.kill('SIGKILL');
+      };
 
       child.stdout.on('data', (chunk: Buffer) => {
         totalOutputBytes += chunk.length;
         if (totalOutputBytes > MAX_OUTPUT_BYTES) {
           outputLimitExceeded = true;
-          child.kill('SIGKILL');
+          terminate();
           return;
         }
         stdoutChunks.push(chunk);
@@ -87,7 +99,7 @@ export class SandboxExecutor {
         totalOutputBytes += chunk.length;
         if (totalOutputBytes > MAX_OUTPUT_BYTES) {
           outputLimitExceeded = true;
-          child.kill('SIGKILL');
+          terminate();
           return;
         }
         stderrChunks.push(chunk);
@@ -95,7 +107,7 @@ export class SandboxExecutor {
 
       const timer = setTimeout(() => {
         timedOut = true;
-        child.kill('SIGKILL');
+        terminate();
       }, timeout);
 
       child.on('close', (code) => {

@@ -2,12 +2,14 @@ import { describe, it, expect, afterEach } from 'vitest';
 import { execFile } from 'child_process';
 import { promisify } from 'util';
 import { mkdtempSync, rmSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { dirname, join, resolve } from 'path';
 import { tmpdir } from 'os';
+import { fileURLToPath } from 'url';
 
 const execFileAsync = promisify(execFile);
-const CLI_CWD = '/Users/ziho/Desktop/ziho_dev/clawcrew';
+const CLI_CWD = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CLI_ENTRY = join(CLI_CWD, 'src/cli.ts');
+const TSX_ENTRY = join(CLI_CWD, 'node_modules', 'tsx', 'dist', 'cli.mjs');
 
 const tempDirs: string[] = [];
 
@@ -83,7 +85,7 @@ function makeTempDataDir(): string {
 }
 
 async function runCli(args: string[], dataDir: string, cwd = CLI_CWD): Promise<{ stdout: string; stderr: string }> {
-  return execFileAsync('npx', ['tsx', CLI_ENTRY, ...args], {
+  return execFileAsync(process.execPath, [TSX_ENTRY, CLI_ENTRY, ...args], {
     cwd,
     env: { ...process.env, DATA_DIR: dataDir },
   });
