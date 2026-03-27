@@ -28,11 +28,35 @@ export class DeveloperAgent extends BaseAgent {
   async act(thought: Thought): Promise<ActionResult> {
     const prompt = `Based on this implementation plan, produce a detailed implementation specification with file structure, key functions, and test stubs:\n\n${thought.reasoning}`;
     const llmResponse = await this.callLLM(prompt, 'medium');
+    const output = llmResponse?.content ?? `Implementation stub for "${thought.summary}".`;
 
     return this.buildResult(
       thought.suggestedAction,
-      llmResponse?.content ?? `Implementation stub for "${thought.summary}".`,
-      { files: [], testFiles: [], usedLLM: !!llmResponse },
+      output,
+      { files: [], testFiles: [], usedLLM: !!llmResponse, llmResponse },
+      [
+        {
+          type: 'artifact',
+          title: 'Implementation specification',
+          summary: 'Produce an implementation artifact and candidate test plan.',
+          risk: 'medium',
+          requiresApproval: true,
+          permissions: ['fs:write'],
+          payload: {
+            artifactType: 'implementation-spec',
+            content: output,
+          },
+        },
+        {
+          type: 'tool_call',
+          title: 'Inspect repository git status',
+          summary: 'Read the current git state before or after implementation work.',
+          risk: 'low',
+          permissions: ['git:read'],
+          toolName: 'git_status',
+          toolInput: { cwd: process.cwd() },
+        },
+      ],
     );
   }
 

@@ -1,0 +1,16 @@
+{
+  "action": "created",
+  "repository": {
+    "full_name": "acme/clawcrew"
+  },
+  "sender": {
+    "login": "reviewer"
+  },
+  "issue": {
+    "title": "Investigate flaky runtime path",
+    "number": 7
+  },
+  "comment": {
+    "body": "/clawcrew review this change before merging"
+  }
+}

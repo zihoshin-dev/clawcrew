@@ -1,4 +1,5 @@
 import type { CostTracker } from '../core/cost-tracker.js';
+import type { ProjectStore, RuntimeCostSummary } from '../persistence/types.js';
 
 export interface CostReport {
   totalCost: number;
@@ -8,25 +9,19 @@ export interface CostReport {
   period: { from: Date; to: Date };
 }
 
+type CostReportSource = CostTracker | Pick<ProjectStore, 'getCostSummary'>;
+
 export class CostReporter {
-  constructor(private readonly costTracker: CostTracker) {}
+  constructor(private readonly source: CostReportSource) {}
 
-  generateReport(projectId?: string): CostReport {
-    const stats =
-      projectId !== undefined
-        ? this.costTracker.getByProject(projectId)
-        : this.costTracker.getTotal();
-
-    // byAgent: map agentId → cost. CostTracker exposes getByAgent but not a
-    // full list; we surface what is available from global stats.
-    const byAgent: Record<string, number> = {};
-    const byModel: Record<string, number> = { ...stats.byModel };
+  generateReport(projectId?: string, runId?: string): CostReport {
+    const summary = this.resolveSummary(projectId, runId);
 
     return {
-      totalCost: stats.totalCost,
-      byAgent,
-      byModel,
-      requestCount: stats.requestCount,
+      totalCost: summary.totalCost,
+      byAgent: { ...summary.byAgent },
+      byModel: { ...summary.byModel },
+      requestCount: summary.requestCount,
       period: { from: new Date(0), to: new Date() },
     };
   }
@@ -88,5 +83,22 @@ export class CostReporter {
     }
 
     return lines.join('\n');
+  }
+
+  private resolveSummary(projectId?: string, runId?: string): RuntimeCostSummary {
+    if ('getCostSummary' in this.source) {
+      return this.source.getCostSummary(projectId, runId);
+    }
+
+    const stats = projectId !== undefined
+      ? this.source.getByProject(projectId)
+      : this.source.getTotal();
+
+    return {
+      totalCost: stats.totalCost,
+      requestCount: stats.requestCount,
+      byModel: { ...stats.byModel },
+      byAgent: {},
+    };
   }
 }

@@ -1,12 +1,21 @@
 {
   "name": "clawcrew",
   "version": "0.1.0",
-  "description": "Messenger-based fully autonomous AI multi-agent software development ecosystem — where AI agents debate, decide, and deploy.",
+  "description": "Durable, review-first AI agent runtime with CLI-first workflows and messenger steering.",
   "type": "module",
   "main": "dist/cli.js",
   "bin": {
     "clawcrew": "dist/cli.js"
   },
+  "files": [
+    "dist",
+    "config",
+    "README.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "examples"
+  ],
   "scripts": {
     "build": "tsc",
     "start": "node dist/cli.js start",
@@ -14,7 +23,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
   },
   "keywords": ["ai", "multi-agent", "autonomous", "slack", "telegram", "sdlc", "orchestration"],
   "license": "MIT",

@@ -8,8 +8,12 @@ import type { Phase } from '../core/types.js';
 import type { MessengerAdapter } from '../messenger/adapter.js';
 
 export interface ApprovalRequest {
+  requestId?: string;
+  runId?: string;
+  stepId?: string;
   projectId: string;
   phase: Phase;
+  channel?: string;
   summary: string;
   /** Milliseconds to wait before auto-rejecting. Default: 1 800 000 (30 min). */
   timeoutMs: number;
@@ -17,6 +21,9 @@ export interface ApprovalRequest {
 
 export interface ApprovalResult {
   approved: boolean;
+  requestId?: string;
+  runId?: string;
+  stepId?: string;
   approvedBy?: string;
   comment?: string;
   respondedAt: Date;
@@ -36,9 +43,13 @@ export class HumanGateManager {
 
     // Emit the requested event
     this.eventBus.emit('HumanApprovalRequested', {
+      requestId: request.requestId,
+      runId: request.runId,
+      stepId: request.stepId,
       projectId: request.projectId,
       phase: request.phase,
       summary: request.summary,
+      channel: request.channel,
       timeoutMs,
       requestedAt: new Date(),
     });
@@ -49,7 +60,7 @@ export class HumanGateManager {
         `Phase *${request.phase}* completed.\n` +
         `Summary: ${request.summary}\n` +
         `Reply *approve* or *reject* within ${timeoutMinutes} minutes.`;
-      await this.messenger.sendMessage(request.projectId, text).catch(() => {
+      await this.messenger.sendMessage(request.channel ?? request.projectId, text).catch(() => {
         // Non-fatal: best-effort notification
       });
     }
@@ -59,13 +70,20 @@ export class HumanGateManager {
       const received = await this.eventBus.waitFor(
         'HumanApprovalReceived',
         (payload) =>
-          payload.projectId === request.projectId &&
-          payload.phase === request.phase,
+          (request.requestId !== undefined && payload.requestId === request.requestId) ||
+          (
+            request.requestId === undefined &&
+            payload.projectId === request.projectId &&
+            payload.phase === request.phase
+          ),
         timeoutMs,
       );
 
       return {
         approved: received.approved,
+        requestId: received.requestId,
+        runId: received.runId,
+        stepId: received.stepId,
         approvedBy: received.approvedBy,
         comment: received.comment,
         respondedAt: received.respondedAt,
@@ -74,12 +92,21 @@ export class HumanGateManager {
       // Timeout — auto-reject (safe default)
       const respondedAt = new Date();
       this.eventBus.emit('HumanApprovalReceived', {
+        requestId: request.requestId,
+        runId: request.runId,
+        stepId: request.stepId,
         projectId: request.projectId,
         phase: request.phase,
         approved: false,
         respondedAt,
       });
-      return { approved: false, respondedAt };
+      return {
+        approved: false,
+        requestId: request.requestId,
+        runId: request.runId,
+        stepId: request.stepId,
+        respondedAt,
+      };
     }
   }
 }

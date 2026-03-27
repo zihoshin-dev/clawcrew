@@ -28,11 +28,24 @@ export class CriticAgent extends BaseAgent {
   async act(thought: Thought): Promise<ActionResult> {
     const prompt = `Based on this critical analysis, produce a structured critique report listing risks, assumptions, and edge cases with severity ratings:\n\n${thought.reasoning}`;
     const llmResponse = await this.callLLM(prompt, 'medium');
+    const output = llmResponse?.content ?? `Critique report stub for "${thought.summary}".`;
 
     return this.buildResult(
       thought.suggestedAction,
-      llmResponse?.content ?? `Critique report stub for "${thought.summary}".`,
-      { risks: [], assumptions: [], edgeCases: [], usedLLM: !!llmResponse },
+      output,
+      { risks: [], assumptions: [], edgeCases: [], usedLLM: !!llmResponse, llmResponse },
+      [
+        {
+          type: 'decision',
+          title: 'Critique report',
+          summary: 'Review the current proposal and capture risks and edge cases.',
+          risk: 'medium',
+          payload: {
+            artifactType: 'critique-report',
+            content: output,
+          },
+        },
+      ],
     );
   }
 
